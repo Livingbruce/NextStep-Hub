@@ -3,5 +3,20 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "cSpell.words": [
+    "chatbubbles",
+    "datetimepicker",
+    "desol",
+    "Ikigai",
+    "Karibu",
+    "Kiambu",
+    "KUCCPS",
+    "mentees",
+    "Meru",
+    "nextstephub",
+    "Pesa",
+    "Recontextualizing",
+    "Upskilling"
+  ]
 }

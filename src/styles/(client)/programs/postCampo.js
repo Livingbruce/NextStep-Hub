@@ -1,0 +1,161 @@
+import { StyleSheet } from "react-native";
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  maxContainer: {
+    width: "100%",
+    maxWidth: 600,
+    alignSelf: "center",
+    flex: 1,
+  },
+  // Top Navigation Bar
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 2,
+    zIndex: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#0F172A",
+    textAlign: "center",
+    flex: 1,
+  },
+  headerRightSpacer: {
+    width: 38,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
+  // Intro Banner
+  introCard: {
+    backgroundColor: "#EFF6FF",
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    marginBottom: 20,
+  },
+  bannerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1E3A8A",
+    marginBottom: 6,
+    lineHeight: 24,
+  },
+  introText: {
+    fontSize: 13,
+    color: "#1E40AF",
+    lineHeight: 20,
+    fontWeight: "500",
+  },
+  // Cards
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    overflow: "hidden",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  cardImage: {
+    width: "100%",
+    height: 180,
+    backgroundColor: "#E2E8F0",
+  },
+  cardContent: {
+    padding: 18,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 6,
+    lineHeight: 22,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 19,
+    marginBottom: 14,
+  },
+  // Bullet Points
+  pointsContainer: {
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+  },
+  pointRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingRight: 4,
+  },
+  bulletPoint: {
+    fontSize: 14,
+    color: "#2563EB",
+    marginRight: 8,
+    lineHeight: 20,
+    fontWeight: "700",
+  },
+  pointText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#334155",
+    lineHeight: 20,
+  },
+  boldText: {
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  // Action Button
+  bookButton: {
+    backgroundColor: "#2563EB",
+    paddingVertical: 15,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 8,
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  bookButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+});
