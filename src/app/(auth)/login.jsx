@@ -16,18 +16,19 @@ import { useAuth } from "../_layout";
 
 import { styles } from "../../styles/(auth)/login";
 
+const ROLES = [
+  { id: "client", label: "Client" },
+  { id: "counselor", label: "Counselor" },
+  { id: "admin", label: "Admin" },
+];
+
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState("client");
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
-
-  const WHITELIST_COUNSELORS = [
-    "counselor@nextstep.co.ke",
-    "lucy@desolnurturers.org",
-  ];
-  const ADMIN_EMAILS = ["admin@nextstep.co.ke"];
 
   const handleLogin = () => {
     if (!email || !password) {
@@ -36,15 +37,9 @@ export default function LoginScreen() {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    let detectedRole = "client";
 
-    if (ADMIN_EMAILS.includes(cleanEmail)) {
-      detectedRole = "admin";
-    } else if (WHITELIST_COUNSELORS.includes(cleanEmail)) {
-      detectedRole = "counselor";
-    }
-
-    login(cleanEmail, detectedRole);
+    // Directly use the role chosen in the picker
+    login(cleanEmail, selectedRole);
   };
 
   const handleBack = () => {
@@ -86,6 +81,36 @@ export default function LoginScreen() {
 
           {/* Form Card */}
           <View style={styles.formCard}>
+            {/* Role Picker */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Select Portal Role</Text>
+              <View style={styles.rolePickerContainer}>
+                {ROLES.map((role) => {
+                  const isSelected = selectedRole === role.id;
+                  return (
+                    <TouchableOpacity
+                      key={role.id}
+                      style={[
+                        styles.roleChip,
+                        isSelected && styles.roleChipActive,
+                      ]}
+                      onPress={() => setSelectedRole(role.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.roleChipText,
+                          isSelected && styles.roleChipTextActive,
+                        ]}
+                      >
+                        {role.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             {/* Email Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Email Address</Text>
@@ -133,7 +158,10 @@ export default function LoginScreen() {
               onPress={handleLogin}
               activeOpacity={0.85}
             >
-              <Text style={styles.submitBtnText}>Sign In</Text>
+              <Text style={styles.submitBtnText}>
+                Sign In as{" "}
+                {selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

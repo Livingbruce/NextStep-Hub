@@ -13,7 +13,11 @@ import {
 } from "react-native";
 import { styles } from "../../styles/(auth)/signup";
 
-const TOTAL_STEPS = 3;
+const ROLES = [
+  { id: "client", label: "Client / User", icon: "person-outline" },
+  { id: "counselor", label: "Counselor", icon: "heart-outline" },
+  { id: "admin", label: "Admin", icon: "shield-checkmark-outline" },
+];
 
 const GENDER_OPTIONS = ["Male", "Female", "Prefer not to say"];
 
@@ -38,29 +42,37 @@ const RELIGION_OPTIONS = [
 export default function SignupScreen() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
+  const [selectedRole, setSelectedRole] = useState("client");
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
-    fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
+    firstName: "",
+    middleName: "",
+    surname: "",
     phoneNo: "",
+    altPhoneNo: "",
     gender: "",
     age: "",
     county: "",
     relationshipStatus: "",
     religion: "",
     otherReligion: "",
+    about: "",
+    yearsOfExperience: "",
+    specializations: ["", "", ""],
     emergencyPhone: "",
     emergencyRelationship: "",
   });
 
   const validateKenyanPhone = (phone) => {
+    if (!phone) return { isValid: false, message: "Phone number is required." };
     const cleanPhone = phone.replace(/[\s\-\(\)]/g, "");
-
     const kenyanPhoneRegex = /^(?:(?:\+?254)|0)?([71]\d{8})$/;
 
     if (!kenyanPhoneRegex.test(cleanPhone)) {
@@ -70,7 +82,6 @@ export default function SignupScreen() {
           "Invalid phone number. Must start with 07, 01, or +254 followed by 8 digits.",
       };
     }
-
     return { isValid: true };
   };
 
@@ -78,68 +89,166 @@ export default function SignupScreen() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const validateStep = () => {
-    if (currentStep === 1) {
-      if (
-        !formData.fullName.trim() ||
-        !formData.email.trim() ||
-        !formData.password ||
-        !formData.confirmPassword ||
-        !formData.phoneNo.trim()
-      ) {
-        Alert.alert("Required Fields", "Please complete all required fields.");
-        return false;
-      }
+  // Dynamic Specializations handlers using functional updates
+  const updateSpecialization = (text, index) => {
+    setFormData((prev) => {
+      const updated = [...prev.specializations];
+      updated[index] = text;
+      return { ...prev, specializations: updated };
+    });
+  };
 
-      const phoneCheck = validateKenyanPhone(formData.phoneNo);
-      if (!phoneCheck.isValid) {
-        Alert.alert("Invalid Phone Number", phoneCheck.message);
-        return false;
-      }
+  const addSpecializationField = () => {
+    setFormData((prev) => ({
+      ...prev,
+      specializations: [...prev.specializations, ""],
+    }));
+  };
 
-      if (formData.password !== formData.confirmPassword) {
-        Alert.alert("Password Error", "Passwords do not match.");
-        return false;
-      }
-    } else if (currentStep === 2) {
-      if (
-        !formData.gender ||
-        !formData.age.trim() ||
-        !formData.county.trim() ||
-        !formData.relationshipStatus
-      ) {
-        Alert.alert("Required Fields", "Please complete all required fields.");
-        return false;
-      }
-    } else if (currentStep === 3) {
-      if (
-        !formData.religion ||
-        (formData.religion === "Other" && !formData.otherReligion.trim()) ||
-        !formData.emergencyPhone.trim() ||
-        !formData.emergencyRelationship.trim()
-      ) {
-        Alert.alert("Required Fields", "Please complete all required fields.");
-        return false;
-      }
+  const removeSpecializationField = (index) => {
+    setFormData((prev) => {
+      if (prev.specializations.length <= 1) return prev;
+      const updated = prev.specializations.filter((_, i) => i !== index);
+      return { ...prev, specializations: updated };
+    });
+  };
 
-      const emergencyPhoneCheck = validateKenyanPhone(formData.emergencyPhone);
-      if (!emergencyPhoneCheck.isValid) {
-        Alert.alert("Invalid Emergency Contact", emergencyPhoneCheck.message);
+  const validateStep1 = () => {
+    if (
+      !formData.email.trim() ||
+      !formData.password ||
+      !formData.confirmPassword
+    ) {
+      Alert.alert("Required Fields", "Please enter email and passwords.");
+      return false;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      Alert.alert("Password Error", "Passwords do not match.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const validateStep2 = () => {
+    if (
+      !formData.firstName.trim() ||
+      !formData.surname.trim() ||
+      !formData.phoneNo.trim()
+    ) {
+      Alert.alert(
+        "Required Fields",
+        "Please enter First Name, Surname, and Phone Number.",
+      );
+      return false;
+    }
+
+    const phoneCheck = validateKenyanPhone(formData.phoneNo);
+    if (!phoneCheck.isValid) {
+      Alert.alert("Invalid Phone Number", phoneCheck.message);
+      return false;
+    }
+
+    if (formData.altPhoneNo.trim()) {
+      const altCheck = validateKenyanPhone(formData.altPhoneNo);
+      if (!altCheck.isValid) {
+        Alert.alert("Invalid Alternative Phone", altCheck.message);
         return false;
       }
     }
+
+    if (selectedRole === "counselor") {
+      if (!formData.yearsOfExperience.trim()) {
+        Alert.alert(
+          "Required Fields",
+          "Please state your years of experience.",
+        );
+        return false;
+      }
+      const validSpecs = formData.specializations.filter(
+        (s) => s.trim().length > 0,
+      );
+      if (validSpecs.length === 0) {
+        Alert.alert(
+          "Required Fields",
+          "Please add at least one area of specialization.",
+        );
+        return false;
+      }
+    }
+
+    if (selectedRole === "client") {
+      if (!formData.gender || !formData.age.trim() || !formData.county.trim()) {
+        Alert.alert(
+          "Required Fields",
+          "Please fill in Gender, Age, and County.",
+        );
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const validateStep3 = () => {
+    if (!formData.relationshipStatus || !formData.religion) {
+      Alert.alert(
+        "Required Fields",
+        "Please select Relationship Status and Religion.",
+      );
+      return false;
+    }
+
+    if (formData.religion === "Other" && !formData.otherReligion.trim()) {
+      Alert.alert("Required Fields", "Please specify your religion.");
+      return false;
+    }
+
+    if (selectedRole === "client") {
+      if (
+        !formData.emergencyPhone.trim() ||
+        !formData.emergencyRelationship.trim()
+      ) {
+        Alert.alert(
+          "Required Fields",
+          "Please complete emergency contact details.",
+        );
+        return false;
+      }
+      const emergencyCheck = validateKenyanPhone(formData.emergencyPhone);
+      if (!emergencyCheck.isValid) {
+        Alert.alert("Invalid Emergency Phone", emergencyCheck.message);
+        return false;
+      }
+    }
+
+    if (selectedRole === "counselor" || selectedRole === "admin") {
+      if (!formData.about.trim()) {
+        Alert.alert(
+          "Required Fields",
+          "Please write a brief background description.",
+        );
+        return false;
+      }
+    }
+
     return true;
   };
 
   const handleNext = () => {
-    if (!validateStep()) return;
-
-    if (currentStep < TOTAL_STEPS) {
-      setCurrentStep((prev) => prev + 1);
-    } else {
-      Alert.alert("Success", "Account created successfully!", [
-        { text: "OK", onPress: () => router.replace("/(auth)/login") },
-      ]);
+    if (currentStep === 1) {
+      if (validateStep1()) setCurrentStep(2);
+    } else if (currentStep === 2) {
+      if (validateStep2()) setCurrentStep(3);
+    } else if (currentStep === 3) {
+      if (validateStep3()) {
+        Alert.alert(
+          "Success",
+          `Account created successfully as ${selectedRole.toUpperCase()}!`,
+          [{ text: "OK", onPress: () => router.replace("/(auth)/login") }],
+        );
+      }
     }
   };
 
@@ -147,11 +256,8 @@ export default function SignupScreen() {
     if (currentStep > 1) {
       setCurrentStep((prev) => prev - 1);
     } else {
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.navigate("/landing");
-      }
+      if (router.canGoBack()) router.back();
+      else router.navigate("/landing");
     }
   };
 
@@ -175,59 +281,75 @@ export default function SignupScreen() {
           >
             <Ionicons name="arrow-back" size={20} color="#0F172A" />
           </TouchableOpacity>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join NextStep Hub today</Text>
+          <Text style={styles.title}>
+            {`${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)} Registration`}
+          </Text>
+          <Text style={styles.subtitle}>Join NextStep today</Text>
         </View>
 
         {/* Progress Tracker */}
         <View style={styles.progressContainer}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressStepText}>
-              Step {currentStep} of {TOTAL_STEPS}
-            </Text>
+            <Text style={styles.progressStepText}>Step {currentStep} of 3</Text>
             <Text style={styles.progressTitleText}>
               {currentStep === 1
-                ? "Account Info"
+                ? "Role & Credentials"
                 : currentStep === 2
-                  ? "Personal Profile"
-                  : "Background & Emergency"}
+                  ? "Personal Information"
+                  : "Profile & Background"}
             </Text>
           </View>
           <View style={styles.progressBarBg}>
             <View
               style={[
                 styles.progressBarFill,
-                { width: `${(currentStep / TOTAL_STEPS) * 100}%` },
+                { width: `${(currentStep / 3) * 100}%` },
               ]}
             />
           </View>
         </View>
 
-        {/* STEP 1: Account Information */}
+        {/* STEP 1: Role Selection + Email & Password */}
         {currentStep === 1 && (
           <View style={styles.formGroup}>
             <View style={styles.inputContainer}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Full Name</Text>
+                <Text style={styles.label}>Select Account Type</Text>
                 <Text style={styles.requiredStar}>*</Text>
               </View>
-              <View style={styles.inputWrapper}>
-                <Ionicons
-                  name="person-outline"
-                  size={18}
-                  color="#64748B"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="First, middle & surname"
-                  placeholderTextColor="#94A3B8"
-                  value={formData.fullName}
-                  onChangeText={(val) => updateField("fullName", val)}
-                />
+              <View style={styles.roleSelectionGrid}>
+                {ROLES.map((role) => {
+                  const isSelected = selectedRole === role.id;
+                  return (
+                    <TouchableOpacity
+                      key={role.id}
+                      style={[
+                        styles.roleCard,
+                        isSelected && styles.selectedRoleCard,
+                      ]}
+                      onPress={() => setSelectedRole(role.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={role.icon}
+                        size={20}
+                        color={isSelected ? "#E3562A" : "#64748B"}
+                      />
+                      <Text
+                        style={[
+                          styles.roleCardText,
+                          isSelected && styles.selectedRoleCardText,
+                        ]}
+                      >
+                        {role.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
+            {/* Email */}
             <View style={styles.inputContainer}>
               <View style={styles.labelRow}>
                 <Text style={styles.label}>Email Address</Text>
@@ -252,29 +374,7 @@ export default function SignupScreen() {
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Phone Number</Text>
-                <Text style={styles.requiredStar}>*</Text>
-              </View>
-              <View style={styles.inputWrapper}>
-                <Ionicons
-                  name="call-outline"
-                  size={18}
-                  color="#64748B"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="0712345678"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="phone-pad"
-                  value={formData.phoneNo}
-                  onChangeText={(val) => updateField("phoneNo", val)}
-                />
-              </View>
-            </View>
-
+            {/* Password */}
             <View style={styles.inputContainer}>
               <View style={styles.labelRow}>
                 <Text style={styles.label}>Password</Text>
@@ -307,6 +407,7 @@ export default function SignupScreen() {
               </View>
             </View>
 
+            {/* Confirm Password */}
             <View style={styles.inputContainer}>
               <View style={styles.labelRow}>
                 <Text style={styles.label}>Confirm Password</Text>
@@ -343,81 +444,262 @@ export default function SignupScreen() {
           </View>
         )}
 
-        {/* STEP 2: Personal Info */}
+        {/* STEP 2: Personal Details */}
         {currentStep === 2 && (
           <View style={styles.formGroup}>
+            <Text style={styles.sectionHeader}>Name Details</Text>
             <View style={styles.inputContainer}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Gender</Text>
+                <Text style={styles.label}>First Name</Text>
                 <Text style={styles.requiredStar}>*</Text>
               </View>
-              <View style={styles.optionsGrid}>
-                {GENDER_OPTIONS.map((item) => (
-                  <TouchableOpacity
-                    key={item}
-                    style={[
-                      styles.chip,
-                      formData.gender === item && styles.selectedChip,
-                    ]}
-                    onPress={() => updateField("gender", item)}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        formData.gender === item && styles.selectedChipText,
-                      ]}
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="First name"
+                  placeholderTextColor="#94A3B8"
+                  value={formData.firstName}
+                  onChangeText={(val) => updateField("firstName", val)}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Middle Name</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Middle name (optional)"
+                  placeholderTextColor="#94A3B8"
+                  value={formData.middleName}
+                  onChangeText={(val) => updateField("middleName", val)}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Surname</Text>
+                <Text style={styles.requiredStar}>*</Text>
+              </View>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Surname"
+                  placeholderTextColor="#94A3B8"
+                  value={formData.surname}
+                  onChangeText={(val) => updateField("surname", val)}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Phone Number</Text>
+                <Text style={styles.requiredStar}>*</Text>
+              </View>
+              <View style={styles.inputWrapper}>
+                <Ionicons
+                  name="call-outline"
+                  size={18}
+                  color="#64748B"
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="0712345678"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="phone-pad"
+                  value={formData.phoneNo}
+                  onChangeText={(val) => updateField("phoneNo", val)}
+                />
+              </View>
+            </View>
+
+            {(selectedRole === "counselor" || selectedRole === "admin") && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Alternative Phone Number</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="call-outline"
+                    size={18}
+                    color="#64748B"
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="0787654321"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="phone-pad"
+                    value={formData.altPhoneNo}
+                    onChangeText={(val) => updateField("altPhoneNo", val)}
+                  />
+                </View>
+              </View>
+            )}
+
+            {selectedRole === "counselor" && (
+              <>
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Years of Experience</Text>
+                    <Text style={styles.requiredStar}>*</Text>
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons
+                      name="briefcase-outline"
+                      size={18}
+                      color="#64748B"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. 5"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                      value={formData.yearsOfExperience}
+                      onChangeText={(val) =>
+                        updateField("yearsOfExperience", val)
+                      }
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRowBetween}>
+                    <Text style={styles.label}>Areas of Specialization</Text>
+                    <TouchableOpacity
+                      onPress={addSpecializationField}
+                      style={styles.addSpecButton}
                     >
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+                      <Ionicons
+                        name="add-circle-outline"
+                        size={20}
+                        color="#E3562A"
+                      />
+                      <Text style={styles.addSpecText}>Add More</Text>
+                    </TouchableOpacity>
+                  </View>
 
-            <View style={styles.inputContainer}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Age</Text>
-                <Text style={styles.requiredStar}>*</Text>
-              </View>
-              <View style={styles.inputWrapper}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color="#64748B"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 21"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="numeric"
-                  value={formData.age}
-                  onChangeText={(val) => updateField("age", val)}
-                />
-              </View>
-            </View>
+                  {formData.specializations.map((spec, idx) => (
+                    <View key={`spec-${idx}`} style={styles.specInputRow}>
+                      <View style={[styles.inputWrapper, { flex: 1 }]}>
+                        <TextInput
+                          style={styles.input}
+                          placeholder={`Specialization ${idx + 1}`}
+                          placeholderTextColor="#94A3B8"
+                          value={spec}
+                          onChangeText={(text) =>
+                            updateSpecialization(text, idx)
+                          }
+                        />
+                      </View>
+                      {formData.specializations.length > 1 && (
+                        <TouchableOpacity
+                          onPress={() => removeSpecializationField(idx)}
+                          style={styles.removeSpecButton}
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={20}
+                            color="#DC2626"
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
 
-            <View style={styles.inputContainer}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>County of Residence</Text>
-                <Text style={styles.requiredStar}>*</Text>
+            {selectedRole === "client" && (
+              <>
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Gender</Text>
+                    <Text style={styles.requiredStar}>*</Text>
+                  </View>
+                  <View style={styles.optionsGrid}>
+                    {GENDER_OPTIONS.map((item) => (
+                      <TouchableOpacity
+                        key={item}
+                        style={[
+                          styles.chip,
+                          formData.gender === item && styles.selectedChip,
+                        ]}
+                        onPress={() => updateField("gender", item)}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            formData.gender === item && styles.selectedChipText,
+                          ]}
+                        >
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Age</Text>
+                    <Text style={styles.requiredStar}>*</Text>
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. 21"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                      value={formData.age}
+                      onChangeText={(val) => updateField("age", val)}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>County of Residence</Text>
+                    <Text style={styles.requiredStar}>*</Text>
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. Nairobi, Meru"
+                      placeholderTextColor="#94A3B8"
+                      value={formData.county}
+                      onChangeText={(val) => updateField("county", val)}
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+          </View>
+        )}
+
+        {/* STEP 3: Background Details */}
+        {currentStep === 3 && (
+          <View style={styles.formGroup}>
+            {(selectedRole === "counselor" || selectedRole === "admin") && (
+              <View style={styles.inputContainer}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.label}>Age</Text>
+                  <Text style={styles.requiredStar}>*</Text>
+                </View>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 35"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numeric"
+                    value={formData.age}
+                    onChangeText={(val) => updateField("age", val)}
+                  />
+                </View>
               </View>
-              <View style={styles.inputWrapper}>
-                <Ionicons
-                  name="location-outline"
-                  size={18}
-                  color="#64748B"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Nairobi, Meru, Kiambu"
-                  placeholderTextColor="#94A3B8"
-                  value={formData.county}
-                  onChangeText={(val) => updateField("county", val)}
-                />
-              </View>
-            </View>
+            )}
 
             <View style={styles.inputContainer}>
               <View style={styles.labelRow}>
@@ -448,15 +730,11 @@ export default function SignupScreen() {
                 ))}
               </View>
             </View>
-          </View>
-        )}
 
-        {/* STEP 3: Religion & Emergency Contact */}
-        {currentStep === 3 && (
-          <View style={styles.formGroup}>
             <View style={styles.inputContainer}>
               <View style={styles.labelRow}>
                 <Text style={styles.label}>Religion</Text>
+                <Text style={styles.requiredStar}>*</Text>
               </View>
               <View style={styles.optionsGrid}>
                 {RELIGION_OPTIONS.map((item) => (
@@ -483,20 +761,10 @@ export default function SignupScreen() {
 
             {formData.religion === "Other" && (
               <View style={styles.inputContainer}>
-                <View style={styles.labelRow}>
-                  <Text style={styles.label}>Specify Religion</Text>
-                  <Text style={styles.requiredStar}>*</Text>
-                </View>
                 <View style={styles.inputWrapper}>
-                  <Ionicons
-                    name="book-outline"
-                    size={18}
-                    color="#64748B"
-                    style={styles.inputIcon}
-                  />
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter religion"
+                    placeholder="Specify Religion"
                     placeholderTextColor="#94A3B8"
                     value={formData.otherReligion}
                     onChangeText={(val) => updateField("otherReligion", val)}
@@ -505,56 +773,75 @@ export default function SignupScreen() {
               </View>
             )}
 
-            <View style={styles.inputContainer}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Emergency Contact Phone</Text>
-                <Text style={styles.requiredStar}>*</Text>
+            {(selectedRole === "counselor" || selectedRole === "admin") && (
+              <View style={styles.inputContainer}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.label}>About / Bio</Text>
+                  <Text style={styles.requiredStar}>*</Text>
+                </View>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    { height: 100, alignItems: "flex-start", paddingTop: 10 },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.input, { textAlignVertical: "top" }]}
+                    placeholder="Describe yourself and professional background..."
+                    placeholderTextColor="#94A3B8"
+                    multiline
+                    numberOfLines={4}
+                    value={formData.about}
+                    onChangeText={(val) => updateField("about", val)}
+                  />
+                </View>
               </View>
-              <View style={styles.inputWrapper}>
-                <Ionicons
-                  name="alert-circle-outline"
-                  size={18}
-                  color="#64748B"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="0712345678"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="phone-pad"
-                  value={formData.emergencyPhone}
-                  onChangeText={(val) => updateField("emergencyPhone", val)}
-                />
-              </View>
-            </View>
+            )}
 
-            <View style={styles.inputContainer}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Relationship with Contact</Text>
-                <Text style={styles.requiredStar}>*</Text>
-              </View>
-              <View style={styles.inputWrapper}>
-                <Ionicons
-                  name="people-outline"
-                  size={18}
-                  color="#64748B"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Parent, Sibling, Friend"
-                  placeholderTextColor="#94A3B8"
-                  value={formData.emergencyRelationship}
-                  onChangeText={(val) =>
-                    updateField("emergencyRelationship", val)
-                  }
-                />
-              </View>
-            </View>
+            {selectedRole === "client" && (
+              <>
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Emergency Contact Phone</Text>
+                    <Text style={styles.requiredStar}>*</Text>
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="0712345678"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="phone-pad"
+                      value={formData.emergencyPhone}
+                      onChangeText={(val) => updateField("emergencyPhone", val)}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>
+                      Emergency Contact Relationship
+                    </Text>
+                    <Text style={styles.requiredStar}>*</Text>
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. Parent, Sibling"
+                      placeholderTextColor="#94A3B8"
+                      value={formData.emergencyRelationship}
+                      onChangeText={(val) =>
+                        updateField("emergencyRelationship", val)
+                      }
+                    />
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         )}
 
-        {/* Step Navigation Actions */}
+        {/* Buttons */}
         <View style={styles.buttonContainer}>
           {currentStep > 1 && (
             <TouchableOpacity
@@ -575,10 +862,10 @@ export default function SignupScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.nextButtonText}>
-              {currentStep === TOTAL_STEPS ? "Create Account" : "Continue"}
+              {currentStep === 3 ? "Create Account" : "Continue"}
             </Text>
             <Ionicons
-              name={currentStep === TOTAL_STEPS ? "checkmark" : "arrow-forward"}
+              name={currentStep === 3 ? "checkmark" : "arrow-forward"}
               size={18}
               color="#FFFFFF"
             />

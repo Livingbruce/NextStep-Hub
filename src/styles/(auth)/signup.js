@@ -35,10 +35,8 @@ export const styles = StyleSheet.create({
     color: "#64748B",
     marginTop: 4,
   },
-
-  // Progress Tracker
   progressContainer: {
-    marginBottom: 28,
+    marginBottom: 24,
   },
   progressHeader: {
     flexDirection: "row",
@@ -47,18 +45,17 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   progressStepText: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "600",
     color: "#E3562A",
   },
   progressTitleText: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12,
     color: "#64748B",
   },
   progressBarBg: {
     height: 6,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#E2E8F0",
     borderRadius: 3,
     overflow: "hidden",
   },
@@ -67,41 +64,87 @@ export const styles = StyleSheet.create({
     backgroundColor: "#E3562A",
     borderRadius: 3,
   },
-
-  // Form Fields
   formGroup: {
     gap: 16,
   },
   inputContainer: {
-    gap: 6,
+    marginBottom: 12,
   },
   labelRow: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 8,
+  },
+  labelRowBetween: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
   label: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
     color: "#334155",
   },
   requiredStar: {
-    fontSize: 14,
-    fontWeight: "700",
     color: "#DC2626",
-    marginLeft: 2,
+    marginLeft: 4,
   },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  /* --- ROLE SELECTION STYLES --- */
+  roleSelectionGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 4,
+  },
+  roleCard: {
+    flex: 1,
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  selectedRoleCard: {
+    borderColor: "#E3562A",
+    backgroundColor: "#FFF5F2",
+  },
+  roleCardText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+    marginTop: 6,
+    textAlign: "center",
+  },
+  selectedRoleCardText: {
+    color: "#E3562A",
+    fontWeight: "700",
+  },
+
+  /* --- INPUT STYLES --- */
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
+    borderColor: "#CBD5E1",
+    borderRadius: 10,
     paddingHorizontal: 12,
     height: 48,
+    backgroundColor: "#FFFFFF",
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   input: {
     flex: 1,
@@ -109,7 +152,33 @@ export const styles = StyleSheet.create({
     color: "#0F172A",
   },
 
-  // Selectable Options (Gender, Relationship, Religion)
+  /* --- SPECIALIZATIONS (Counselor, Step 2) --- */
+  addSpecButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  addSpecText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#E3562A",
+  },
+  specInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  removeSpecButton: {
+    width: 40,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "#FEF2F2",
+  },
+
+  /* --- CHIP / OPTIONS SELECTION (Gender, Relationship, Religion) --- */
   optionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -117,62 +186,62 @@ export const styles = StyleSheet.create({
     marginTop: 4,
   },
   chip: {
-    paddingHorizontal: 14,
     paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 20,
-    backgroundColor: "#F1F5F9",
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
   },
   selectedChip: {
-    backgroundColor: "#FEF2F2",
     borderColor: "#E3562A",
+    backgroundColor: "#FFF5F2",
   },
   chipText: {
     fontSize: 13,
-    fontWeight: "500",
-    color: "#475569",
+    fontWeight: "600",
+    color: "#64748B",
   },
   selectedChipText: {
     color: "#E3562A",
     fontWeight: "700",
   },
 
-  // Actions
+  /* --- BUTTON STYLES --- */
   buttonContainer: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 32,
-  },
-  backStepButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backStepText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#475569",
+    marginTop: 24,
   },
   nextButton: {
-    flex: 2,
+    flex: 1,
     height: 50,
-    borderRadius: 25,
     backgroundColor: "#E3562A",
+    borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
   },
   fullWidthButton: {
-    flex: 1,
+    width: "100%",
   },
   nextButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
     color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  backStepButton: {
+    flex: 1,
+    height: 50,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backStepText: {
+    color: "#475569",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
