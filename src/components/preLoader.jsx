@@ -1,94 +1,168 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 
-export default function Preloader({ onFinish }) {
-  const progress = useRef(new Animated.Value(0)).current;
+const MIN_DISPLAY_MS = 2600;
 
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: 5500,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+export default function Preloader({ onFinish, isReady = true }) {
+  const introProgress = useRef(new Animated.Value(0)).current;
+  const idlePulse = useRef(new Animated.Value(0)).current;
+  const exitOpacity = useRef(new Animated.Value(1)).current;
+
+  const [introDone, setIntroDone] = useState(false);
+  const readyRef = useRef(isReady);
+  const minTimeElapsedRef = useRef(false);
+  const idleLoopRef = useRef(null);
+  const finishedRef = useRef(false);
+
+  const tryFinish = () => {
+    if (finishedRef.current) return;
+    if (!introDone) return;
+    if (!minTimeElapsedRef.current) return;
+    if (!readyRef.current) return;
+
+    finishedRef.current = true;
+    idleLoopRef.current?.stop();
+
+    Animated.timing(exitOpacity, {
+      toValue: 0,
+      duration: 420,
+      easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
-      if (onFinish) onFinish();
+      onFinish?.();
     });
+  };
+
+  // One-shot intro animation, plus the minimum display timer.
+  useEffect(() => {
+    Animated.timing(introProgress, {
+      toValue: 1,
+      duration: 2600,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => setIntroDone(true));
+
+    const minTimer = setTimeout(() => {
+      minTimeElapsedRef.current = true;
+      tryFinish();
+    }, MIN_DISPLAY_MS);
+
+    return () => clearTimeout(minTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Track isReady changes without restarting the intro.
+  useEffect(() => {
+    readyRef.current = isReady;
+    tryFinish();
+  }, [isReady]);
+
+  useEffect(() => {
+    if (!introDone) return;
+
+    idleLoopRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(idlePulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(idlePulse, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    idleLoopRef.current.start();
+
+    tryFinish();
+
+    return () => idleLoopRef.current?.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [introDone]);
 
   // --- INTERPOLATIONS ---
 
-  // SCENE 1: "NSM" initial appearance (0.0 - 0.22)
-  const nsmOpacity = progress.interpolate({
-    inputRange: [0, 0.1, 0.22, 0.72, 0.85, 0.95],
-    outputRange: [0, 1, 0, 0, 1, 0],
+  // Stage A (0 – 0.55): "NSM" appears, holds, then fades as expansion begins
+  const nsmOpacity = introProgress.interpolate({
+    inputRange: [0, 0.15, 0.4, 0.55],
+    outputRange: [0, 1, 1, 0],
+    extrapolate: "clamp",
+  });
+  const nsmScale = introProgress.interpolate({
+    inputRange: [0, 0.15, 0.55],
+    outputRange: [0.85, 1, 1.08],
+    extrapolate: "clamp",
   });
 
-  const nsmScale = progress.interpolate({
-    inputRange: [0, 0.22, 0.72, 0.92],
-    outputRange: [0.85, 1, 1, 0.95],
+  // Stage B (0.45 – 1): expands into "NextStep Mentorship" and settles
+  const fullTextOpacity = introProgress.interpolate({
+    inputRange: [0.45, 0.6, 1],
+    outputRange: [0, 1, 1],
+    extrapolate: "clamp",
+  });
+  const fullTextScale = introProgress.interpolate({
+    inputRange: [0.45, 0.65, 1],
+    outputRange: [0.9, 1, 1],
+    extrapolate: "clamp",
   });
 
-  // SCENE 2: Expansion to "NextStep Mentorship" (0.22 - 0.72)
-  const fullTextOpacity = progress.interpolate({
-    inputRange: [0, 0.2, 0.32, 0.62, 0.75, 1],
-    outputRange: [0, 0, 1, 1, 0, 0],
+  // Background glow, active throughout, plus a subtle idle breathing add-on
+  const rayOpacity = introProgress.interpolate({
+    inputRange: [0, 0.3, 0.7, 1],
+    outputRange: [0, 0.3, 0.75, 0.55],
+    extrapolate: "clamp",
+  });
+  const rayScale = Animated.add(
+    introProgress.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0.6, 1.15, 1.35],
+      extrapolate: "clamp",
+    }),
+    idlePulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.08] }),
+  );
+
+  // Stage C (0.5 – 1): sprout grows in step with the text settling
+  const shootTranslateY = introProgress.interpolate({
+    inputRange: [0.5, 0.75, 1],
+    outputRange: [40, 0, -6],
+    extrapolate: "clamp",
+  });
+  const shootScaleY = introProgress.interpolate({
+    inputRange: [0.5, 0.7, 0.85, 1],
+    outputRange: [0.15, 1.2, 0.95, 1],
+    extrapolate: "clamp",
+  });
+  const shootScaleX = introProgress.interpolate({
+    inputRange: [0.5, 0.75, 1],
+    outputRange: [0.3, 1.1, 1],
+    extrapolate: "clamp",
+  });
+  const shootOpacity = introProgress.interpolate({
+    inputRange: [0.5, 0.62, 1],
+    outputRange: [0, 1, 1],
+    extrapolate: "clamp",
   });
 
-  const fullTextScale = progress.interpolate({
-    inputRange: [0.22, 0.38, 0.62, 0.75],
-    outputRange: [0.8, 1, 1.05, 0.9],
-  });
-
-  // SCENE 2 & 3: Background Light Rays (0.18 - 0.82)
-  const rayOpacity = progress.interpolate({
-    inputRange: [0, 0.18, 0.45, 0.7, 0.88, 1],
-    outputRange: [0, 0.25, 0.85, 0.7, 0.2, 0],
-  });
-
-  const rayScale = progress.interpolate({
-    inputRange: [0.18, 0.5, 0.88],
-    outputRange: [0.5, 1.3, 1.7],
-  });
-
-  // SCENE 3 & 4: Sprouting Plant Motion
-  const shootTranslateY = progress.interpolate({
-    inputRange: [0, 0.38, 0.68, 0.88, 1],
-    outputRange: [100, 100, 0, -10, -10],
-  });
-
-  // Scale starts tiny (0.1) as a sprout seed, grows vertically, then expands broad
-  const shootScaleX = progress.interpolate({
-    inputRange: [0, 0.38, 0.52, 0.72, 0.88, 1],
-    outputRange: [0.1, 0.1, 0.4, 1.2, 1.4, 1],
-  });
-
-  const shootScaleY = progress.interpolate({
-    inputRange: [0, 0.38, 0.58, 0.72, 0.88, 1],
-    outputRange: [0.1, 0.1, 1.3, 1.1, 1.2, 1],
-  });
-
-  const shootOpacity = progress.interpolate({
-    inputRange: [0, 0.38, 0.45, 0.9, 0.98],
-    outputRange: [0, 0, 1, 1, 0],
+  const idleScale = idlePulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.03],
   });
 
   return (
-    <View style={styles.container}>
-      {/* Background Light Ray Aura */}
+    <Animated.View style={[styles.container, { opacity: exitOpacity }]}>
       <Animated.View
         style={[
           styles.rayGlow,
-          {
-            opacity: rayOpacity,
-            transform: [{ scale: rayScale }],
-          },
+          { opacity: rayOpacity, transform: [{ scale: rayScale }] },
         ]}
       />
 
-      {/* Center Text Container */}
       <View style={styles.textContainer}>
-        {/* Short Text: NSM */}
         <Animated.Text
           style={[
             styles.titleText,
@@ -102,14 +176,15 @@ export default function Preloader({ onFinish }) {
           NSM
         </Animated.Text>
 
-        {/* Full Expanded Text: NextStep Mentorship */}
         <Animated.Text
           style={[
             styles.titleText,
             styles.fullText,
             {
               opacity: fullTextOpacity,
-              transform: [{ scale: fullTextScale }],
+              transform: [
+                { scale: Animated.multiply(fullTextScale, idleScale) },
+              ],
             },
           ]}
         >
@@ -117,7 +192,6 @@ export default function Preloader({ onFinish }) {
         </Animated.Text>
       </View>
 
-      {/* Sprouting Shoot & Leaves */}
       <Animated.View
         style={[
           styles.shootContainer,
@@ -131,12 +205,10 @@ export default function Preloader({ onFinish }) {
           },
         ]}
       >
-        {/* Sprout Stem Base */}
         <View style={styles.stem} />
-        {/* Broad Leaves */}
         <Ionicons name="leaf" size={44} color="#4ADE80" />
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 

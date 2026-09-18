@@ -78,6 +78,30 @@ export const styles = StyleSheet.create({
     color: "#475569",
     marginBottom: 6,
   },
+  rolePickerContainer: {
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  roleChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  roleChipActive: {
+    backgroundColor: "#16A34A",
+  },
+  roleChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  roleChipTextActive: {
+    color: "#FFFFFF",
+  },
   formInput: {
     borderWidth: 1,
     borderColor: "#E2E8F0",

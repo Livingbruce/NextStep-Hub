@@ -1,0 +1,265 @@
+import { StyleSheet } from "react-native";
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    marginTop: 2,
+  },
+  whitelistSection: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  whitelistCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#0F172A",
+    marginBottom: 6,
+  },
+  emailInput: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#0F172A",
+    marginBottom: 12,
+  },
+  rolePickerRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 14,
+  },
+  roleChip: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  activeRoleChip: {
+    backgroundColor: "#1E3A8A",
+    borderColor: "#1E3A8A",
+  },
+  roleChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  activeRoleChipText: {
+    color: "#FFFFFF",
+  },
+  whitelistBtn: {
+    backgroundColor: "#1E3A8A",
+    borderRadius: 8,
+    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  whitelistBtnText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  staffListHeader: {
+    paddingHorizontal: 20,
+  },
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: "#E2E8F0",
+    borderRadius: 8,
+    padding: 3,
+    marginBottom: 12,
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 6,
+  },
+  activeTabItem: {
+    backgroundColor: "#FFFFFF",
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  activeTabText: {
+    color: "#1E3A8A",
+    fontWeight: "700",
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E3A8A",
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  userEmail: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  activeBadge: {
+    backgroundColor: "#ECFDF5",
+  },
+  suspendedBadge: {
+    backgroundColor: "#FEF3C7",
+  },
+  pendingBadge: {
+    backgroundColor: "#F1F5F9",
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  activeStatusText: {
+    color: "#059669",
+  },
+  suspendedStatusText: {
+    color: "#D97706",
+  },
+  pendingStatusText: {
+    color: "#64748B",
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+    paddingTop: 10,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  approveBtn: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0",
+  },
+  approveBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  suspendBtn: {
+    backgroundColor: "#FEF3C7",
+    borderColor: "#FDE68A",
+  },
+  suspendBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#D97706",
+  },
+  removeBtn: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  removeBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#DC2626",
+  },
+  emptyContainer: {
+    paddingTop: 40,
+    alignItems: "center",
+  },
+  emptyText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+});
