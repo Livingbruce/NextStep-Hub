@@ -104,8 +104,6 @@ export default function SignupScreen() {
         return "Client";
       }
 
-      // If email exists in whitelist, take their assigned role ('Counselor' | 'Admin')
-      // Otherwise default to 'Client'
       const assignedRole = data?.role ? data.role : "Client";
       setSelectedRole(assignedRole);
       return assignedRole;
@@ -193,6 +191,11 @@ export default function SignupScreen() {
     }
 
     if (selectedRole === "Counselor") {
+      if (!formData.gender) {
+        Alert.alert("Required Fields", "Please select your gender");
+        return false;
+      }
+
       if (!formData.yearsOfExperience.trim()) {
         Alert.alert(
           "Required Fields",
@@ -270,10 +273,6 @@ export default function SignupScreen() {
     return true;
   };
 
-  // Build the full profiles payload from everything collected across all
-  // three steps. Only role-relevant fields are included; irrelevant ones
-  // (e.g. emergency contact for a Counselor) are left out rather than
-  // written as empty strings.
   const buildProfilePayload = (userId, cleanEmail, fullName) => {
     const isClient = selectedRole === "Client";
     const isCounselor = selectedRole === "Counselor";
@@ -312,6 +311,7 @@ export default function SignupScreen() {
 
     if (isCounselor) {
       payload.age = formData.age ? parseInt(formData.age, 10) : null;
+      payload.gender = formData.gender;
       payload.years_of_experience = formData.yearsOfExperience
         ? parseInt(formData.yearsOfExperience, 10)
         : null;
@@ -383,7 +383,7 @@ export default function SignupScreen() {
       // 3. Route to corresponding portal after successful signup
       Alert.alert(
         "Registration Successful",
-        `Welcome to NextStep! Signed up as ${selectedRole}.`,
+        "Welcome to Nextstep! Registration scuccessful",
         [
           {
             text: "Proceed",
@@ -668,6 +668,34 @@ export default function SignupScreen() {
 
             {selectedRole === "Counselor" && (
               <>
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Gender</Text>
+                    <Text style={styles.requiredStar}>*</Text>
+                  </View>
+                  <View style={styles.optionsGrid}>
+                    {GENDER_OPTIONS.map((item) => (
+                      <TouchableOpacity
+                        key={item}
+                        style={[
+                          styles.chip,
+                          formData.gender === item && styles.selectedChip,
+                        ]}
+                        onPress={() => updateField("gender", item)}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            formData === item && styles.selectedChipText,
+                          ]}
+                        >
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
                 <View style={styles.inputContainer}>
                   <View style={styles.labelRow}>
                     <Text style={styles.label}>Years of Experience</Text>
