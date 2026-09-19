@@ -27,17 +27,17 @@ export default function StaffManagement() {
   const fetchStaffData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch whitelisted records (only email and role stored)
+      // 1. Fetch whitelisted records
       const { data: whitelist, error: whitelistErr } = await supabase
         .from("staff_whitelist")
         .select("id, email, role");
 
       if (whitelistErr) throw whitelistErr;
 
-      // 2. Fetch created profiles matching staff roles
+      // 2. Fetch created profiles matching staff roles using updated boolean flags
       const { data: profiles, error: profilesErr } = await supabase
         .from("profiles")
-        .select("id, full_name, email, role, status")
+        .select("id, full_name, email, role, approved, suspended")
         .in("role", ["Counselor", "Admin"]);
 
       if (profilesErr) throw profilesErr;
@@ -46,12 +46,21 @@ export default function StaffManagement() {
 
       // 3. Process registered staff from profiles
       profiles?.forEach((prof) => {
+        let derivedStatus = "Pending Approval";
+        if (prof.suspended) {
+          derivedStatus = "Suspended";
+        } else if (prof.approved) {
+          derivedStatus = "Active";
+        }
+
         combined.push({
           id: prof.id,
           name: prof.full_name || null,
           email: prof.email,
           role: prof.role,
-          status: prof.status || "Active",
+          approved: prof.approved ?? false,
+          suspended: prof.suspended ?? false,
+          status: derivedStatus,
           hasAccount: true,
         });
       });
@@ -59,7 +68,7 @@ export default function StaffManagement() {
       // 4. Process pending whitelist entries (not yet signed up)
       whitelist?.forEach((wl) => {
         const isRegistered = profiles?.some(
-          (p) => p.email.toLowerCase() === wl.email.toLowerCase(),
+          (p) => p.email?.toLowerCase() === wl.email?.toLowerCase(),
         );
 
         if (!isRegistered) {
@@ -69,6 +78,8 @@ export default function StaffManagement() {
             name: null,
             email: wl.email,
             role: wl.role,
+            approved: false,
+            suspended: false,
             status: "Pending Signup",
             hasAccount: false,
           });
@@ -96,7 +107,7 @@ export default function StaffManagement() {
     }
 
     const emailExists = staffList.some(
-      (s) => s.email.toLowerCase() === cleanEmail,
+      (s) => s.email?.toLowerCase() === cleanEmail,
     );
 
     if (emailExists) {
@@ -129,12 +140,12 @@ export default function StaffManagement() {
     }
   };
 
-  // Staff Action Handlers
+  // Approval handler setting approved: true & suspended: false
   const handleApprove = async (item) => {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ status: "Active" })
+        .update({ approved: true, suspended: false })
         .eq("id", item.id);
 
       if (error) throw error;
@@ -146,19 +157,24 @@ export default function StaffManagement() {
     }
   };
 
-  const handleSuspend = async (item) => {
+  // Toggle suspension state
+  const handleToggleSuspend = async (item) => {
+    const newSuspendedState = !item.suspended;
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ status: "Suspended" })
+        .update({ suspended: newSuspendedState })
         .eq("id", item.id);
 
       if (error) throw error;
 
-      Alert.alert("Staff Suspended", `${item.email} has been suspended.`);
+      Alert.alert(
+        newSuspendedState ? "Staff Suspended" : "Staff Un-suspended",
+        `${item.email} has been ${newSuspendedState ? "suspended" : "reactivated"}.`,
+      );
       fetchStaffData();
     } catch (err) {
-      Alert.alert("Error Suspending", err.message);
+      Alert.alert("Error updating suspension", err.message);
     }
   };
 
@@ -180,13 +196,11 @@ export default function StaffManagement() {
                   .eq("id", item.id);
                 if (profErr) throw profErr;
 
-                // Also clean up staff_whitelist entry if present
                 await supabase
                   .from("staff_whitelist")
                   .delete()
                   .eq("email", item.email.toLowerCase());
               } else {
-                // Delete pending whitelist entry by its whitelist row ID
                 const { error: wlErr } = await supabase
                   .from("staff_whitelist")
                   .delete()
@@ -206,7 +220,7 @@ export default function StaffManagement() {
   };
 
   const filteredStaff = staffList.filter(
-    (s) => s.role.toLowerCase() === selectedRoleTab.toLowerCase(),
+    (s) => s.role?.toLowerCase() === selectedRoleTab.toLowerCase(),
   );
 
   const renderStaffCard = ({ item }) => {
@@ -219,7 +233,7 @@ export default function StaffManagement() {
             <Text style={styles.avatarText}>
               {item.name
                 ? item.name.charAt(0).toUpperCase()
-                : item.email.charAt(0).toUpperCase()}
+                : item.email?.charAt(0).toUpperCase()}
             </Text>
           </View>
           <View style={styles.userInfo}>
@@ -260,7 +274,7 @@ export default function StaffManagement() {
 
         {/* Action Buttons */}
         <View style={styles.actionRow}>
-          {!isPendingSignup && item.status !== "Active" && (
+          {!isPendingSignup && !item.approved && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.approveBtn]}
               onPress={() => handleApprove(item)}
@@ -274,13 +288,23 @@ export default function StaffManagement() {
             </TouchableOpacity>
           )}
 
-          {!isPendingSignup && item.status !== "Suspended" && (
+          {!isPendingSignup && item.approved && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.suspendBtn]}
-              onPress={() => handleSuspend(item)}
+              onPress={() => handleToggleSuspend(item)}
             >
-              <Ionicons name="pause-circle-outline" size={16} color="#D97706" />
-              <Text style={styles.suspendBtnText}>Suspend</Text>
+              <Ionicons
+                name={
+                  item.suspended
+                    ? "play-circle-outline"
+                    : "pause-circle-outline"
+                }
+                size={16}
+                color="#D97706"
+              />
+              <Text style={styles.suspendBtnText}>
+                {item.suspended ? "Unsuspend" : "Suspend"}
+              </Text>
             </TouchableOpacity>
           )}
 

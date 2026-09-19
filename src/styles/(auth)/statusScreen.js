@@ -1,0 +1,100 @@
+import { StyleSheet } from "react-native";
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  content: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  iconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+  },
+  pendingIconCircle: {
+    backgroundColor: "#FEF3C7",
+  },
+  suspendedIconCircle: {
+    backgroundColor: "#FEE2E2",
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#0F172A",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  description: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 28,
+  },
+  card: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 28,
+  },
+  cardHeader: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#334155",
+    marginBottom: 8,
+  },
+  cardText: {
+    fontSize: 13,
+    color: "#64748B",
+    marginBottom: 6,
+    lineHeight: 18,
+  },
+  contactEmail: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0284C7",
+    marginTop: 4,
+  },
+  primaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#0284C7",
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  primaryBtnText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  secondaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#F1F5F9",
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 10,
+  },
+  secondaryBtnText: {
+    color: "#475569",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+});
