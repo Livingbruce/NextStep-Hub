@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -11,13 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { supabase } from "../../../libs/supabase";
 import { styles } from "../../styles/(auth)/signup";
-
-const ROLES = [
-  { id: "client", label: "Client / User", icon: "person-outline" },
-  { id: "counselor", label: "Counselor", icon: "heart-outline" },
-  { id: "admin", label: "Admin", icon: "shield-checkmark-outline" },
-];
 
 const GENDER_OPTIONS = ["Male", "Female", "Prefer not to say"];
 
@@ -42,7 +38,8 @@ const RELIGION_OPTIONS = [
 export default function SignupScreen() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedRole, setSelectedRole] = useState("client");
+  const [selectedRole, setSelectedRole] = useState("Client");
+  const [loading, setLoading] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -89,7 +86,39 @@ export default function SignupScreen() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Dynamic Specializations handlers using functional updates
+  // Query Supabase staff_whitelist table for role assignment
+  const fetchWhitelistRole = async (email) => {
+    const cleanEmail = email.trim().toLowerCase();
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("staff_whitelist")
+        .select("role")
+        .eq("email", cleanEmail)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error querying whitelist:", error.message);
+        setSelectedRole("Client");
+        return "Client";
+      }
+
+      // If email exists in whitelist, take their assigned role ('Counselor' | 'Admin')
+      // Otherwise default to 'Client'
+      const assignedRole = data?.role ? data.role : "Client";
+      setSelectedRole(assignedRole);
+      return assignedRole;
+    } catch (err) {
+      console.error("Unexpected error querying whitelist:", err);
+      setSelectedRole("Client");
+      return "Client";
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Specialization handlers
   const updateSpecialization = (text, index) => {
     setFormData((prev) => {
       const updated = [...prev.specializations];
@@ -128,6 +157,11 @@ export default function SignupScreen() {
       return false;
     }
 
+    if (formData.password.length < 6) {
+      Alert.alert("Weak Password", "Password must be at least 6 characters.");
+      return false;
+    }
+
     return true;
   };
 
@@ -158,7 +192,7 @@ export default function SignupScreen() {
       }
     }
 
-    if (selectedRole === "counselor") {
+    if (selectedRole === "Counselor") {
       if (!formData.yearsOfExperience.trim()) {
         Alert.alert(
           "Required Fields",
@@ -178,7 +212,7 @@ export default function SignupScreen() {
       }
     }
 
-    if (selectedRole === "client") {
+    if (selectedRole === "Client") {
       if (!formData.gender || !formData.age.trim() || !formData.county.trim()) {
         Alert.alert(
           "Required Fields",
@@ -205,7 +239,7 @@ export default function SignupScreen() {
       return false;
     }
 
-    if (selectedRole === "client") {
+    if (selectedRole === "Client") {
       if (
         !formData.emergencyPhone.trim() ||
         !formData.emergencyRelationship.trim()
@@ -223,7 +257,7 @@ export default function SignupScreen() {
       }
     }
 
-    if (selectedRole === "counselor" || selectedRole === "admin") {
+    if (selectedRole === "Counselor" || selectedRole === "Admin") {
       if (!formData.about.trim()) {
         Alert.alert(
           "Required Fields",
@@ -236,18 +270,148 @@ export default function SignupScreen() {
     return true;
   };
 
-  const handleNext = () => {
+  // Build the full profiles payload from everything collected across all
+  // three steps. Only role-relevant fields are included; irrelevant ones
+  // (e.g. emergency contact for a Counselor) are left out rather than
+  // written as empty strings.
+  const buildProfilePayload = (userId, cleanEmail, fullName) => {
+    const isClient = selectedRole === "Client";
+    const isCounselor = selectedRole === "Counselor";
+    const isAdmin = selectedRole === "Admin";
+
+    const resolvedReligion =
+      formData.religion === "Other"
+        ? formData.otherReligion.trim()
+        : formData.religion;
+
+    const payload = {
+      id: userId,
+      email: cleanEmail,
+      first_name: formData.firstName.trim(),
+      middle_name: formData.middleName.trim() || null,
+      surname: formData.surname.trim(),
+      full_name: fullName,
+      role: selectedRole,
+      phone_no: formData.phoneNo.trim(),
+      alt_phone_no: formData.altPhoneNo.trim() || null,
+      relationship_status: formData.relationshipStatus,
+      religion: resolvedReligion,
+
+      // Clients are auto-approved; Counselors/Admins wait for admin review.
+      approved: isClient,
+      suspended: false,
+    };
+
+    if (isClient) {
+      payload.gender = formData.gender;
+      payload.age = formData.age ? parseInt(formData.age, 10) : null;
+      payload.county = formData.county.trim();
+      payload.emergency_phone = formData.emergencyPhone.trim();
+      payload.emergency_relationship = formData.emergencyRelationship.trim();
+    }
+
+    if (isCounselor) {
+      payload.age = formData.age ? parseInt(formData.age, 10) : null;
+      payload.years_of_experience = formData.yearsOfExperience
+        ? parseInt(formData.yearsOfExperience, 10)
+        : null;
+      payload.specializations = formData.specializations
+        .map((s) => s.trim())
+        .filter(Boolean);
+      payload.about = formData.about.trim();
+    }
+
+    if (isAdmin) {
+      payload.age = formData.age ? parseInt(formData.age, 10) : null;
+      payload.about = formData.about.trim();
+    }
+
+    return payload;
+  };
+
+  // Submit complete registration flow
+  const handleFinalSignup = async () => {
+    setLoading(true);
+    const cleanEmail = formData.email.trim().toLowerCase();
+    const fullName = `${formData.firstName.trim()} ${
+      formData.middleName.trim() ? formData.middleName.trim() + " " : ""
+    }${formData.surname.trim()}`;
+
+    try {
+      // 1. Authenticate with Supabase Auth (Generates UUID)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: selectedRole,
+          },
+        },
+      });
+
+      if (authError) {
+        Alert.alert("Registration Error", authError.message);
+        setLoading(false);
+        return;
+      }
+
+      const userId = authData?.user?.id;
+
+      if (!userId) {
+        Alert.alert(
+          "Error",
+          "Could not retrieve authenticated user ID. Please try again.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      // 2. Save full profile data into public.profiles
+      const profilePayload = buildProfilePayload(userId, cleanEmail, fullName);
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert([profilePayload]);
+
+      if (profileError) {
+        Alert.alert("Profile Error", profileError.message);
+        setLoading(false);
+        return;
+      }
+
+      // 3. Route to corresponding portal after successful signup
+      Alert.alert(
+        "Registration Successful",
+        `Welcome to NextStep! Signed up as ${selectedRole}.`,
+        [
+          {
+            text: "Proceed",
+            onPress: () => {
+              router.replace("login");
+            },
+          },
+        ],
+      );
+    } catch (err) {
+      Alert.alert("Error", "An unexpected error occurred during signup.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNext = async () => {
     if (currentStep === 1) {
-      if (validateStep1()) setCurrentStep(2);
+      if (validateStep1()) {
+        await fetchWhitelistRole(formData.email);
+        setCurrentStep(2);
+      }
     } else if (currentStep === 2) {
       if (validateStep2()) setCurrentStep(3);
     } else if (currentStep === 3) {
       if (validateStep3()) {
-        Alert.alert(
-          "Success",
-          `Account created successfully as ${selectedRole.toUpperCase()}!`,
-          [{ text: "OK", onPress: () => router.replace("/(auth)/login") }],
-        );
+        await handleFinalSignup();
       }
     }
   };
@@ -281,10 +445,11 @@ export default function SignupScreen() {
           >
             <Ionicons name="arrow-back" size={20} color="#0F172A" />
           </TouchableOpacity>
-          <Text style={styles.title}>
-            {`${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)} Registration`}
+          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.subtitle}>
+            Role Detected:{" "}
+            <Text style={{ fontWeight: "700" }}>{selectedRole}</Text>
           </Text>
-          <Text style={styles.subtitle}>Join NextStep today</Text>
         </View>
 
         {/* Progress Tracker */}
@@ -293,7 +458,7 @@ export default function SignupScreen() {
             <Text style={styles.progressStepText}>Step {currentStep} of 3</Text>
             <Text style={styles.progressTitleText}>
               {currentStep === 1
-                ? "Role & Credentials"
+                ? "Credentials"
                 : currentStep === 2
                   ? "Personal Information"
                   : "Profile & Background"}
@@ -309,46 +474,9 @@ export default function SignupScreen() {
           </View>
         </View>
 
-        {/* STEP 1: Role Selection + Email & Password */}
+        {/* STEP 1: Account Credentials */}
         {currentStep === 1 && (
           <View style={styles.formGroup}>
-            <View style={styles.inputContainer}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Select Account Type</Text>
-                <Text style={styles.requiredStar}>*</Text>
-              </View>
-              <View style={styles.roleSelectionGrid}>
-                {ROLES.map((role) => {
-                  const isSelected = selectedRole === role.id;
-                  return (
-                    <TouchableOpacity
-                      key={role.id}
-                      style={[
-                        styles.roleCard,
-                        isSelected && styles.selectedRoleCard,
-                      ]}
-                      onPress={() => setSelectedRole(role.id)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={role.icon}
-                        size={20}
-                        color={isSelected ? "#E3562A" : "#64748B"}
-                      />
-                      <Text
-                        style={[
-                          styles.roleCardText,
-                          isSelected && styles.selectedRoleCardText,
-                        ]}
-                      >
-                        {role.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
             {/* Email */}
             <View style={styles.inputContainer}>
               <View style={styles.labelRow}>
@@ -516,7 +644,7 @@ export default function SignupScreen() {
               </View>
             </View>
 
-            {(selectedRole === "counselor" || selectedRole === "admin") && (
+            {(selectedRole === "Counselor" || selectedRole === "Admin") && (
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Alternative Phone Number</Text>
                 <View style={styles.inputWrapper}>
@@ -538,7 +666,7 @@ export default function SignupScreen() {
               </View>
             )}
 
-            {selectedRole === "counselor" && (
+            {selectedRole === "Counselor" && (
               <>
                 <View style={styles.inputContainer}>
                   <View style={styles.labelRow}>
@@ -612,7 +740,7 @@ export default function SignupScreen() {
               </>
             )}
 
-            {selectedRole === "client" && (
+            {selectedRole === "Client" && (
               <>
                 <View style={styles.inputContainer}>
                   <View style={styles.labelRow}>
@@ -682,7 +810,7 @@ export default function SignupScreen() {
         {/* STEP 3: Background Details */}
         {currentStep === 3 && (
           <View style={styles.formGroup}>
-            {(selectedRole === "counselor" || selectedRole === "admin") && (
+            {(selectedRole === "Counselor" || selectedRole === "Admin") && (
               <View style={styles.inputContainer}>
                 <View style={styles.labelRow}>
                   <Text style={styles.label}>Age</Text>
@@ -773,7 +901,7 @@ export default function SignupScreen() {
               </View>
             )}
 
-            {(selectedRole === "counselor" || selectedRole === "admin") && (
+            {(selectedRole === "Counselor" || selectedRole === "Admin") && (
               <View style={styles.inputContainer}>
                 <View style={styles.labelRow}>
                   <Text style={styles.label}>About / Bio</Text>
@@ -798,7 +926,7 @@ export default function SignupScreen() {
               </View>
             )}
 
-            {selectedRole === "client" && (
+            {selectedRole === "Client" && (
               <>
                 <View style={styles.inputContainer}>
                   <View style={styles.labelRow}>
@@ -841,12 +969,13 @@ export default function SignupScreen() {
           </View>
         )}
 
-        {/* Buttons */}
+        {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           {currentStep > 1 && (
             <TouchableOpacity
               style={styles.backStepButton}
               onPress={handlePrev}
+              disabled={loading}
               activeOpacity={0.8}
             >
               <Text style={styles.backStepText}>Back</Text>
@@ -859,16 +988,16 @@ export default function SignupScreen() {
               currentStep === 1 && styles.fullWidthButton,
             ]}
             onPress={handleNext}
+            disabled={loading}
             activeOpacity={0.85}
           >
-            <Text style={styles.nextButtonText}>
-              {currentStep === 3 ? "Create Account" : "Continue"}
-            </Text>
-            <Ionicons
-              name={currentStep === 3 ? "checkmark" : "arrow-forward"}
-              size={18}
-              color="#FFFFFF"
-            />
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.nextButtonText}>
+                {currentStep === 3 ? "Create Account" : "Continue"}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

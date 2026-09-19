@@ -25,7 +25,7 @@ export default function RootLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    SplashScreen.hideAsync();
+    SplashScreen.hideAsync().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -71,8 +71,8 @@ export default function RootLayout() {
     }
   }, [user, segments, isPreloaderDone]);
 
-  const login = async (email, role) => {
-    const sessionUser = { email, role };
+  const login = async (email, role, profile = null) => {
+    const sessionUser = { email, role, profile };
     setUser(sessionUser);
     try {
       await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));

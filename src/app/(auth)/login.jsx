@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -12,34 +13,73 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../../libs/supabase";
 import { useAuth } from "../_layout";
 
 import { styles } from "../../styles/(auth)/login";
 
-const ROLES = [
-  { id: "client", label: "Client" },
-  { id: "counselor", label: "Counselor" },
-  { id: "admin", label: "Admin" },
-];
-
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedRole, setSelectedRole] = useState("client");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Please enter your email and password.");
+      Alert.alert("Invalid Input", "Please provide both email and password.");
       return;
     }
 
     const cleanEmail = email.toLowerCase().trim();
+    setLoading(true);
 
-    // Directly use the role chosen in the picker
-    login(cleanEmail, selectedRole);
+    try {
+      // 1. Authenticate credentials against Supabase Auth
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password,
+        });
+
+      if (authError || !authData.user) {
+        Alert.alert(
+          "Sign In Failed",
+          "Invalid email or password. Please check your credentials and try again.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fetch user's actual profile & assigned role directly from Supabase
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role, id, full_name")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        Alert.alert(
+          "Account Error",
+          "Unable to load profile settings. Please try again or contact support.",
+        );
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      // 3. Authenticate context with dynamically fetched profile role
+      login(cleanEmail, profile.role, profile);
+    } catch (err) {
+      Alert.alert(
+        "Connection Error",
+        "An unexpected error occurred. Please check your connection and try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -68,6 +108,7 @@ export default function LoginScreen() {
               onPress={handleBack}
               activeOpacity={0.7}
               accessibilityLabel="Go back"
+              disabled={loading}
             >
               <Ionicons name="arrow-back" size={20} color="#0F172A" />
             </TouchableOpacity>
@@ -81,36 +122,6 @@ export default function LoginScreen() {
 
           {/* Form Card */}
           <View style={styles.formCard}>
-            {/* Role Picker */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Select Portal Role</Text>
-              <View style={styles.rolePickerContainer}>
-                {ROLES.map((role) => {
-                  const isSelected = selectedRole === role.id;
-                  return (
-                    <TouchableOpacity
-                      key={role.id}
-                      style={[
-                        styles.roleChip,
-                        isSelected && styles.roleChipActive,
-                      ]}
-                      onPress={() => setSelectedRole(role.id)}
-                      activeOpacity={0.8}
-                    >
-                      <Text
-                        style={[
-                          styles.roleChipText,
-                          isSelected && styles.roleChipTextActive,
-                        ]}
-                      >
-                        {role.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
             {/* Email Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Email Address</Text>
@@ -122,10 +133,11 @@ export default function LoginScreen() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={!loading}
               />
             </View>
 
-            {/* Password Input with Eye Icon */}
+            {/* Password Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Password</Text>
               <View style={styles.passwordWrapper}>
@@ -137,11 +149,13 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
+                  editable={!loading}
                 />
                 <TouchableOpacity
                   style={styles.eyeIconBtn}
                   onPress={() => setShowPassword(!showPassword)}
                   activeOpacity={0.7}
+                  disabled={loading}
                 >
                   <Ionicons
                     name={showPassword ? "eye-outline" : "eye-off-outline"}
@@ -154,14 +168,16 @@ export default function LoginScreen() {
 
             {/* Sign In Button */}
             <TouchableOpacity
-              style={styles.submitBtn}
+              style={[styles.submitBtn, loading && { opacity: 0.7 }]}
               onPress={handleLogin}
               activeOpacity={0.85}
+              disabled={loading}
             >
-              <Text style={styles.submitBtnText}>
-                Sign In as{" "}
-                {selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}
-              </Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.submitBtnText}>Sign In</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>

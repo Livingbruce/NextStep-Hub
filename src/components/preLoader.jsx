@@ -41,7 +41,9 @@ export default function Preloader({ onFinish, isReady = true }) {
       duration: 2600,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start(() => setIntroDone(true));
+    }).start(() => {
+      setIntroDone(true);
+    });
 
     const minTimer = setTimeout(() => {
       minTimeElapsedRef.current = true;
@@ -58,6 +60,7 @@ export default function Preloader({ onFinish, isReady = true }) {
     tryFinish();
   }, [isReady]);
 
+  // When intro completes, trigger loop AND attempt completion call
   useEffect(() => {
     if (!introDone) return;
 
@@ -79,6 +82,7 @@ export default function Preloader({ onFinish, isReady = true }) {
     );
     idleLoopRef.current.start();
 
+    // Re-check finish condition now that introDone is guaranteed true
     tryFinish();
 
     return () => idleLoopRef.current?.stop();
@@ -87,7 +91,6 @@ export default function Preloader({ onFinish, isReady = true }) {
 
   // --- INTERPOLATIONS ---
 
-  // Stage A (0 – 0.55): "NSM" appears, holds, then fades as expansion begins
   const nsmOpacity = introProgress.interpolate({
     inputRange: [0, 0.15, 0.4, 0.55],
     outputRange: [0, 1, 1, 0],
@@ -99,7 +102,6 @@ export default function Preloader({ onFinish, isReady = true }) {
     extrapolate: "clamp",
   });
 
-  // Stage B (0.45 – 1): expands into "NextStep Mentorship" and settles
   const fullTextOpacity = introProgress.interpolate({
     inputRange: [0.45, 0.6, 1],
     outputRange: [0, 1, 1],
@@ -111,7 +113,6 @@ export default function Preloader({ onFinish, isReady = true }) {
     extrapolate: "clamp",
   });
 
-  // Background glow, active throughout, plus a subtle idle breathing add-on
   const rayOpacity = introProgress.interpolate({
     inputRange: [0, 0.3, 0.7, 1],
     outputRange: [0, 0.3, 0.75, 0.55],
@@ -126,7 +127,6 @@ export default function Preloader({ onFinish, isReady = true }) {
     idlePulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.08] }),
   );
 
-  // Stage C (0.5 – 1): sprout grows in step with the text settling
   const shootTranslateY = introProgress.interpolate({
     inputRange: [0.5, 0.75, 1],
     outputRange: [40, 0, -6],
