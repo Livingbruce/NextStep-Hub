@@ -5,6 +5,10 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8FAFC",
   },
+  center: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -170,6 +174,32 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     color: "#0F172A",
     marginTop: 2,
+  },
+  genderOptionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 6,
+  },
+  genderChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+  },
+  genderChipSelected: {
+    backgroundColor: "#1E3A8A",
+    borderColor: "#1E3A8A",
+  },
+  genderChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  genderChipTextSelected: {
+    color: "#FFFFFF",
   },
   bioInput: {
     minHeight: 90,
