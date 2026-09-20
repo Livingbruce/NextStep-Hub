@@ -1,8 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
+import { decode } from "base64-arraybuffer";
+import * as ImagePicker from "expo-image-picker";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -10,87 +20,176 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../../libs/supabase";
 import { styles } from "../../styles/(counselor)/programs";
 
-const INITIAL_PROGRAMS = [
+const LOCATION_TYPES = [
   {
-    id: "p1",
-    title: "Campus Readiness Workshop 2026",
-    category: "Pre-Campus Transition",
-    date: "Sept 25, 2026 • 2:00 PM",
-    location: "Virtual (Google Meet)",
-    description:
-      "A comprehensive guide to course registration, budgeting, and social adaptation for new university students.",
-    status: "Available",
-    participants: [
-      {
-        id: "c1",
-        name: "Brian Kiprop",
-        email: "brian.kiprop@example.com",
-        phone: "0712345678",
-        county: "Meru",
-        educationLevel: "High School Leaver",
-        status: "Registered",
-      },
-      {
-        id: "c2",
-        name: "Wanjiru Kamau",
-        email: "wanjiru.k@example.com",
-        phone: "0798765432",
-        county: "Nairobi",
-        educationLevel: "Form 4 Graduate",
-        status: "Registered",
-      },
-    ],
+    value: "physical",
+    label: "Physical",
+    icon: "location-outline",
+    placeholder: "Venue / address",
   },
   {
-    id: "p2",
-    title: "Career Pitching & CV Masterclass",
-    category: "Post-Campus Career Pitching",
-    date: "Aug 10, 2026",
-    location: "Nairobi Innovation Hub",
-    description:
-      "Practical session on writing high-impact resumes and interviewing for entry-level tech roles.",
-    status: "Past",
-    participants: [
-      {
-        id: "c3",
-        name: "Mercy Chebet",
-        email: "mercy.c@example.com",
-        phone: "0722112233",
-        county: "Nakuru",
-        educationLevel: "Degree Holder",
-        status: "Participated",
-      },
-    ],
+    value: "virtual",
+    label: "Virtual",
+    icon: "videocam-outline",
+    placeholder: "Meeting link (Google Meet, Zoom...)",
+  },
+  {
+    value: "phone",
+    label: "Via Phone",
+    icon: "call-outline",
+    placeholder: "Phone number or dial-in details",
   },
 ];
 
-export default function Programs() {
-  const [programs, setPrograms] = useState(INITIAL_PROGRAMS);
+const MAX_MODERATORS = 10;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // Full-screen Participants Modal State
-  const [selectedProgram, setSelectedProgram] = useState(null);
+const emptyModerator = () => ({ name: "", email: "", phone: "" });
+
+const defaultStart = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(10, 0, 0, 0);
+  return d;
+};
+
+const formatDateTime = (value) =>
+  new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+// Convert a database row into the shape the screen uses
+const mapProgram = (row) => ({
+  id: row.id,
+  createdBy: row.created_by,
+  title: row.title,
+  category: row.category,
+  description: row.description || "",
+  startsAt: row.starts_at,
+  locationType: row.location_type,
+  locationDetails: row.location_details,
+  isPaid: row.is_paid,
+  amount: row.amount,
+  currency: row.currency || "KES",
+  posterUrl: row.poster_url,
+  posterPath: row.poster_path,
+  status: new Date(row.starts_at) >= new Date() ? "Available" : "Past",
+  moderators: (row.program_moderators || []).map((m) => ({
+    id: m.id,
+    name: m.full_name,
+    email: m.email,
+    phone: m.phone_no,
+  })),
+  participants: (row.program_participants || []).map((p) => {
+    const c = Array.isArray(p.client) ? p.client[0] : p.client;
+    return {
+      id: p.id,
+      name:
+        c?.full_name ||
+        [c?.first_name, c?.surname].filter(Boolean).join(" ") ||
+        "Unknown client",
+      email: c?.email || "Not provided",
+      phone: c?.phone_no || "Not provided",
+      county: c?.county || "Not provided",
+      status: p.status === "participated" ? "Participated" : "Registered",
+    };
+  }),
+});
+
+export default function Programs() {
+  const [programs, setPrograms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Participants modal
+  const [selectedProgramId, setSelectedProgramId] = useState(null);
   const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
   const [expandedParticipantId, setExpandedParticipantId] = useState(null);
 
-  // Edit / Add Program Modal State
+  // Create / edit modal
   const [isProgramModalOpen, setIsProgramModalOpen] = useState(false);
   const [editingProgram, setEditingProgram] = useState(null);
   const [formTitle, setFormTitle] = useState("");
   const [formCategory, setFormCategory] = useState("");
-  const [formDate, setFormDate] = useState("");
-  const [formLocation, setFormLocation] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formStartsAt, setFormStartsAt] = useState(defaultStart());
+  const [formLocationType, setFormLocationType] = useState("physical");
+  const [formLocationDetails, setFormLocationDetails] = useState("");
+  const [formIsPaid, setFormIsPaid] = useState(false);
+  const [formAmount, setFormAmount] = useState("");
+  const [formPoster, setFormPoster] = useState(null); // { uri, base64?, ext?, isNew }
+  const [formModeratorCount, setFormModeratorCount] = useState("0");
+  const [formModerators, setFormModerators] = useState([]);
 
-  // Program Handlers
+  const selectedProgram = programs.find((p) => p.id === selectedProgramId);
+
+  // ---------------------------------------------------------------
+  // Data loading
+  // ---------------------------------------------------------------
+  const fetchPrograms = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("programs")
+        .select(
+          `
+          *,
+          program_moderators ( id, full_name, email, phone_no ),
+          program_participants (
+            id,
+            status,
+            client:profiles!program_participants_client_id_fkey (
+              id, full_name, first_name, surname, email, phone_no, county
+            )
+          )
+        `,
+        )
+        .order("starts_at", { ascending: true });
+
+      if (error) throw error;
+
+      setPrograms((data || []).map(mapProgram));
+    } catch (err) {
+      console.error("Fetch programs error:", err);
+      Alert.alert("Error", err?.message || "Could not load programs.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPrograms();
+  }, [fetchPrograms]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchPrograms();
+  };
+
+  // ---------------------------------------------------------------
+  // Form helpers
+  // ---------------------------------------------------------------
   const handleOpenAddModal = () => {
     setEditingProgram(null);
     setFormTitle("");
     setFormCategory("");
-    setFormDate("");
-    setFormLocation("");
     setFormDescription("");
+    setFormStartsAt(defaultStart());
+    setFormLocationType("physical");
+    setFormLocationDetails("");
+    setFormIsPaid(false);
+    setFormAmount("");
+    setFormPoster(null);
+    setFormModeratorCount("0");
+    setFormModerators([]);
     setIsProgramModalOpen(true);
   };
 
@@ -98,73 +197,331 @@ export default function Programs() {
     setEditingProgram(prog);
     setFormTitle(prog.title);
     setFormCategory(prog.category);
-    setFormDate(prog.date);
-    setFormLocation(prog.location);
     setFormDescription(prog.description);
+    setFormStartsAt(new Date(prog.startsAt));
+    setFormLocationType(prog.locationType);
+    setFormLocationDetails(prog.locationDetails);
+    setFormIsPaid(prog.isPaid);
+    setFormAmount(prog.amount ? String(Math.round(Number(prog.amount))) : "");
+    setFormPoster(
+      prog.posterUrl ? { uri: prog.posterUrl, isNew: false } : null,
+    );
+    setFormModeratorCount(String(prog.moderators.length));
+    setFormModerators(
+      prog.moderators.map((m) => ({
+        name: m.name,
+        email: m.email,
+        phone: m.phone,
+      })),
+    );
     setIsProgramModalOpen(true);
   };
 
-  const handleSaveProgram = () => {
-    if (!formTitle || !formDate) {
-      Alert.alert(
-        "Error",
-        "Please fill in at least the program title and date.",
-      );
+  const handleLocationTypeChange = (type) => {
+    if (type === formLocationType) return;
+    setFormLocationType(type);
+    setFormLocationDetails("");
+  };
+
+  const handleModeratorCountChange = (text) => {
+    const digits = text.replace(/[^0-9]/g, "");
+    if (digits === "") {
+      setFormModeratorCount("");
+      setFormModerators([]);
+      return;
+    }
+    const count = Math.min(parseInt(digits, 10), MAX_MODERATORS);
+    setFormModeratorCount(String(count));
+    setFormModerators((prev) =>
+      Array.from({ length: count }, (_, i) => prev[i] || emptyModerator()),
+    );
+  };
+
+  const updateModerator = (index, field, value) => {
+    setFormModerators((prev) =>
+      prev.map((m, i) => (i === index ? { ...m, [field]: value } : m)),
+    );
+  };
+
+  // Android: pick the date, then the time
+  const openAndroidDateTimePicker = () => {
+    DateTimePickerAndroid.open({
+      value: formStartsAt || defaultStart(),
+      mode: "date",
+      minimumDate: editingProgram ? undefined : new Date(),
+      onChange: (event, date) => {
+        if (event.type !== "set" || !date) return;
+
+        DateTimePickerAndroid.open({
+          value: date,
+          mode: "time",
+          onChange: (timeEvent, time) => {
+            if (timeEvent.type !== "set" || !time) return;
+            const combined = new Date(date);
+            combined.setHours(time.getHours(), time.getMinutes(), 0, 0);
+            setFormStartsAt(combined);
+          },
+        });
+      },
+    });
+  };
+
+  const handlePickPoster = async () => {
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission Required",
+          "Allow access to your photos to add an event poster.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const asset = result.assets[0];
+
+      if (!asset.base64) {
+        Alert.alert("Upload Failed", "Could not read the selected image.");
+        return;
+      }
+
+      let ext = asset.uri?.split(".").pop()?.toLowerCase() || "jpeg";
+      if (ext === "jpg") ext = "jpeg";
+      if (!["jpeg", "png", "webp"].includes(ext)) ext = "jpeg";
+
+      setFormPoster({
+        uri: asset.uri,
+        base64: asset.base64,
+        ext,
+        isNew: true,
+      });
+    } catch (err) {
+      console.error("Poster picker error:", err);
+      Alert.alert("Error", err?.message || "Could not select the image.");
+    }
+  };
+
+  const validateForm = () => {
+    if (!formTitle.trim()) return "Please enter the program title.";
+    if (!formStartsAt) return "Please choose the date and time.";
+    if (!editingProgram && formStartsAt < new Date()) {
+      return "Please choose a date and time in the future.";
+    }
+    if (!formLocationDetails.trim()) {
+      return "Please enter the venue, meeting link or phone details.";
+    }
+    if (formIsPaid) {
+      const amount = parseFloat(formAmount);
+      if (!amount || amount <= 0) {
+        return "Please enter a valid amount for this paid program.";
+      }
+    }
+    for (let i = 0; i < formModerators.length; i++) {
+      const m = formModerators[i];
+      const label = `Moderator ${i + 1}`;
+      if (!m.name.trim()) return `${label}: name is required.`;
+      if (!EMAIL_REGEX.test(m.email.trim())) {
+        return `${label}: enter a valid email address.`;
+      }
+      if (m.phone.replace(/\D/g, "").length < 9) {
+        return `${label}: enter a valid phone number.`;
+      }
+    }
+    return null;
+  };
+
+  // ---------------------------------------------------------------
+  // Save / delete program
+  // ---------------------------------------------------------------
+  const handleSaveProgram = async () => {
+    const problem = validateForm();
+    if (problem) {
+      Alert.alert("Missing information", problem);
       return;
     }
 
-    if (editingProgram) {
-      setPrograms((prev) =>
-        prev.map((p) =>
-          p.id === editingProgram.id
-            ? {
-                ...p,
-                title: formTitle,
-                category: formCategory,
-                date: formDate,
-                location: formLocation,
-                description: formDescription,
-              }
-            : p,
-        ),
-      );
-    } else {
-      const newProg = {
-        id: `p_${Date.now()}`,
-        title: formTitle,
-        category: formCategory || "General Mentorship",
-        date: formDate,
-        location: formLocation || "Online",
-        description: formDescription,
-        status: "Available",
-        participants: [],
-      };
-      setPrograms((prev) => [newProg, ...prev]);
-    }
+    try {
+      setSaving(true);
 
-    setIsProgramModalOpen(false);
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        Alert.alert(
+          "Authentication Error",
+          "Your session has expired. Please log in again.",
+        );
+        return;
+      }
+
+      // ---- Poster ----
+      const oldPosterPath = editingProgram?.posterPath || null;
+      let posterUrl = editingProgram?.posterUrl || null;
+      let posterPath = oldPosterPath;
+      let removeOldPoster = false;
+
+      if (formPoster?.isNew) {
+        const path = `${user.id}/${Date.now()}.${formPoster.ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("posters")
+          .upload(path, decode(formPoster.base64), {
+            contentType: `image/${formPoster.ext}`,
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("posters").getPublicUrl(path);
+
+        posterUrl = publicUrl;
+        posterPath = path;
+        removeOldPoster = !!oldPosterPath;
+      } else if (!formPoster) {
+        posterUrl = null;
+        posterPath = null;
+        removeOldPoster = !!oldPosterPath;
+      }
+
+      // ---- Program row ----
+      const payload = {
+        title: formTitle.trim(),
+        category: formCategory.trim() || "General Mentorship",
+        description: formDescription.trim() || null,
+        starts_at: formStartsAt.toISOString(),
+        location_type: formLocationType,
+        location_details: formLocationDetails.trim(),
+        is_paid: formIsPaid,
+        amount: formIsPaid ? parseFloat(formAmount) : null,
+        poster_url: posterUrl,
+        poster_path: posterPath,
+        moderator_count: formModerators.length,
+      };
+
+      let programId = editingProgram?.id;
+
+      if (editingProgram) {
+        const { data, error } = await supabase
+          .from("programs")
+          .update(payload)
+          .eq("id", editingProgram.id)
+          .select("id");
+
+        if (error) throw error;
+        if (!data?.length) {
+          throw new Error("You do not have permission to edit this program.");
+        }
+      } else {
+        const { data, error } = await supabase
+          .from("programs")
+          .insert({ ...payload, created_by: user.id })
+          .select("id")
+          .single();
+
+        if (error) throw error;
+        programId = data.id;
+      }
+
+      // ---- Moderators (replace the full list) ----
+      if (editingProgram) {
+        const { error: clearError } = await supabase
+          .from("program_moderators")
+          .delete()
+          .eq("program_id", programId);
+
+        if (clearError) throw clearError;
+      }
+
+      if (formModerators.length > 0) {
+        const { error: moderatorError } = await supabase
+          .from("program_moderators")
+          .insert(
+            formModerators.map((m) => ({
+              program_id: programId,
+              full_name: m.name.trim(),
+              email: m.email.trim().toLowerCase(),
+              phone_no: m.phone.trim(),
+            })),
+          );
+
+        if (moderatorError) throw moderatorError;
+      }
+
+      // ---- Clean up the replaced poster (best effort) ----
+      if (removeOldPoster && oldPosterPath) {
+        await supabase.storage.from("posters").remove([oldPosterPath]);
+      }
+
+      setIsProgramModalOpen(false);
+      await fetchPrograms();
+    } catch (err) {
+      console.error("Save program error:", err);
+      Alert.alert("Save Failed", err?.message || "Could not save the program.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteProgram = (id) => {
+  const handleDeleteProgram = (prog) => {
     Alert.alert(
       "Delete Program",
-      "Are you sure you want to delete this program?",
+      "Are you sure you want to delete this program? Its participants and moderators will be removed too.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            setPrograms((prev) => prev.filter((p) => p.id !== id));
+          onPress: async () => {
+            try {
+              const { data, error } = await supabase
+                .from("programs")
+                .delete()
+                .eq("id", prog.id)
+                .select("id");
+
+              if (error) throw error;
+              if (!data?.length) {
+                throw new Error(
+                  "You do not have permission to delete this program.",
+                );
+              }
+
+              if (prog.posterPath) {
+                await supabase.storage
+                  .from("posters")
+                  .remove([prog.posterPath]);
+              }
+
+              fetchPrograms();
+            } catch (err) {
+              Alert.alert("Delete Failed", err?.message || "Please try again.");
+            }
           },
         },
       ],
     );
   };
 
-  // Participant Management Handlers
+  // ---------------------------------------------------------------
+  // Participants
+  // ---------------------------------------------------------------
   const handleOpenParticipants = (prog) => {
-    setSelectedProgram(prog);
+    setSelectedProgramId(prog.id);
     setIsParticipantsModalOpen(true);
     setExpandedParticipantId(null);
   };
@@ -173,19 +530,24 @@ export default function Programs() {
     setExpandedParticipantId((prev) => (prev === id ? null : id));
   };
 
-  const handleMarkParticipated = (participantId) => {
-    if (!selectedProgram) return;
+  const handleMarkParticipated = async (participantId) => {
+    try {
+      const { data, error } = await supabase
+        .from("program_participants")
+        .update({ status: "participated" })
+        .eq("id", participantId)
+        .select("id");
 
-    const updatedParticipants = selectedProgram.participants.map((p) =>
-      p.id === participantId ? { ...p, status: "Participated" } : p,
-    );
+      if (error) throw error;
+      if (!data?.length) throw new Error("Could not update this participant.");
 
-    updateProgramParticipants(selectedProgram.id, updatedParticipants);
+      fetchPrograms();
+    } catch (err) {
+      Alert.alert("Update Failed", err?.message || "Please try again.");
+    }
   };
 
   const handleRemoveParticipant = (participantId) => {
-    if (!selectedProgram) return;
-
     Alert.alert(
       "Remove Participant",
       "Remove this client from the registered list?",
@@ -194,26 +556,40 @@ export default function Programs() {
         {
           text: "Remove",
           style: "destructive",
-          onPress: () => {
-            const updatedParticipants = selectedProgram.participants.filter(
-              (p) => p.id !== participantId,
-            );
-            updateProgramParticipants(selectedProgram.id, updatedParticipants);
+          onPress: async () => {
+            try {
+              const { data, error } = await supabase
+                .from("program_participants")
+                .delete()
+                .eq("id", participantId)
+                .select("id");
+
+              if (error) throw error;
+              if (!data?.length) {
+                throw new Error("Could not remove this participant.");
+              }
+
+              fetchPrograms();
+            } catch (err) {
+              Alert.alert("Remove Failed", err?.message || "Please try again.");
+            }
           },
         },
       ],
     );
   };
 
-  const updateProgramParticipants = (progId, newParticipants) => {
-    const updatedProg = { ...selectedProgram, participants: newParticipants };
-    setSelectedProgram(updatedProg);
-
-    setPrograms((prev) => prev.map((p) => (p.id === progId ? updatedProg : p)));
-  };
-
+  // ---------------------------------------------------------------
+  // Derived lists
+  // ---------------------------------------------------------------
   const availablePrograms = programs.filter((p) => p.status === "Available");
-  const pastPrograms = programs.filter((p) => p.status === "Past");
+  const pastPrograms = programs
+    .filter((p) => p.status === "Past")
+    .sort((a, b) => new Date(b.startsAt) - new Date(a.startsAt));
+
+  const activeLocation = LOCATION_TYPES.find(
+    (l) => l.value === formLocationType,
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -226,42 +602,57 @@ export default function Programs() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Available Programs Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Available Programs</Text>
-          {availablePrograms.length === 0 ? (
-            <Text style={styles.emptyText}>No active programs available.</Text>
-          ) : (
-            availablePrograms.map((prog) => (
-              <ProgramCard
-                key={prog.id}
-                program={prog}
-                onEdit={() => handleOpenEditModal(prog)}
-                onDelete={() => handleDeleteProgram(prog.id)}
-                onViewParticipants={() => handleOpenParticipants(prog)}
-              />
-            ))
-          )}
-        </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color="#1E3A8A"
+            style={styles.loader}
+          />
+        ) : (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Available Programs</Text>
+              {availablePrograms.length === 0 ? (
+                <Text style={styles.emptyText}>
+                  No active programs available.
+                </Text>
+              ) : (
+                availablePrograms.map((prog) => (
+                  <ProgramCard
+                    key={prog.id}
+                    program={prog}
+                    onEdit={() => handleOpenEditModal(prog)}
+                    onDelete={() => handleDeleteProgram(prog)}
+                    onViewParticipants={() => handleOpenParticipants(prog)}
+                  />
+                ))
+              )}
+            </View>
 
-        {/* Past Programs Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Past Programs</Text>
-          {pastPrograms.length === 0 ? (
-            <Text style={styles.emptyText}>No past programs recorded.</Text>
-          ) : (
-            pastPrograms.map((prog) => (
-              <ProgramCard
-                key={prog.id}
-                program={prog}
-                onEdit={() => handleOpenEditModal(prog)}
-                onDelete={() => handleDeleteProgram(prog.id)}
-                onViewParticipants={() => handleOpenParticipants(prog)}
-              />
-            ))
-          )}
-        </View>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Past Programs</Text>
+              {pastPrograms.length === 0 ? (
+                <Text style={styles.emptyText}>No past programs recorded.</Text>
+              ) : (
+                pastPrograms.map((prog) => (
+                  <ProgramCard
+                    key={prog.id}
+                    program={prog}
+                    onEdit={() => handleOpenEditModal(prog)}
+                    onDelete={() => handleDeleteProgram(prog)}
+                    onViewParticipants={() => handleOpenParticipants(prog)}
+                  />
+                ))
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* FULL SCREEN PARTICIPANTS MODAL */}
@@ -288,7 +679,7 @@ export default function Programs() {
           </View>
 
           <ScrollView contentContainerStyle={styles.participantsList}>
-            {selectedProgram?.participants.length === 0 ? (
+            {!selectedProgram || selectedProgram.participants.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="people-outline" size={40} color="#94A3B8" />
                 <Text style={styles.emptyText}>
@@ -296,13 +687,12 @@ export default function Programs() {
                 </Text>
               </View>
             ) : (
-              selectedProgram?.participants.map((client) => {
+              selectedProgram.participants.map((client) => {
                 const isExpanded = expandedParticipantId === client.id;
                 const isAttended = client.status === "Participated";
 
                 return (
                   <View key={client.id} style={styles.participantCard}>
-                    {/* Expandable Header / Client Name */}
                     <TouchableOpacity
                       style={styles.participantHeader}
                       onPress={() => toggleExpandParticipant(client.id)}
@@ -328,7 +718,6 @@ export default function Programs() {
                       />
                     </TouchableOpacity>
 
-                    {/* Collapsible Info Drawer */}
                     {isExpanded && (
                       <View style={styles.participantDetails}>
                         <View style={styles.detailRow}>
@@ -357,20 +746,9 @@ export default function Programs() {
                             County: {client.county}
                           </Text>
                         </View>
-                        <View style={styles.detailRow}>
-                          <Ionicons
-                            name="school-outline"
-                            size={16}
-                            color="#64748B"
-                          />
-                          <Text style={styles.detailText}>
-                            Level: {client.educationLevel}
-                          </Text>
-                        </View>
                       </View>
                     )}
 
-                    {/* Participant Actions Row */}
                     <View style={styles.participantActions}>
                       <TouchableOpacity
                         style={[
@@ -421,72 +799,299 @@ export default function Programs() {
         visible={isProgramModalOpen}
         transparent
         animationType="fade"
-        onRequestClose={() => setIsProgramModalOpen(false)}
+        onRequestClose={() => !saving && setIsProgramModalOpen(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
           <View style={styles.formModalCard}>
             <Text style={styles.formModalTitle}>
               {editingProgram ? "Edit Program" : "Create New Program"}
             </Text>
 
-            <TextInput
-              style={styles.formInput}
-              placeholder="Program Title"
-              placeholderTextColor="#94A3B8"
-              value={formTitle}
-              onChangeText={setFormTitle}
-            />
+            <ScrollView
+              style={styles.formScroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Basics */}
+              <Text style={styles.fieldLabel}>Program Title *</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="e.g. Campus Readiness Workshop"
+                placeholderTextColor="#94A3B8"
+                value={formTitle}
+                onChangeText={setFormTitle}
+              />
 
-            <TextInput
-              style={styles.formInput}
-              placeholder="Category (e.g. Pre-Campus Transition)"
-              placeholderTextColor="#94A3B8"
-              value={formCategory}
-              onChangeText={setFormCategory}
-            />
+              <Text style={styles.fieldLabel}>Category</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="e.g. Pre-Campus Transition"
+                placeholderTextColor="#94A3B8"
+                value={formCategory}
+                onChangeText={setFormCategory}
+              />
 
-            <TextInput
-              style={styles.formInput}
-              placeholder="Date & Time (e.g. Oct 12, 10:00 AM)"
-              placeholderTextColor="#94A3B8"
-              value={formDate}
-              onChangeText={setFormDate}
-            />
+              {/* Date & time */}
+              <Text style={styles.fieldLabel}>Date & Time *</Text>
+              {Platform.OS === "android" ? (
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={openAndroidDateTimePicker}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#1E3A8A" />
+                  <Text style={styles.dateButtonText}>
+                    {formatDateTime(formStartsAt)}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.iosPickerRow}>
+                  <DateTimePicker
+                    value={formStartsAt}
+                    mode="datetime"
+                    display="compact"
+                    minimumDate={editingProgram ? undefined : new Date()}
+                    onChange={(_, selected) => {
+                      if (selected) setFormStartsAt(selected);
+                    }}
+                  />
+                </View>
+              )}
 
-            <TextInput
-              style={styles.formInput}
-              placeholder="Location or Virtual Link"
-              placeholderTextColor="#94A3B8"
-              value={formLocation}
-              onChangeText={setFormLocation}
-            />
+              {/* Location */}
+              <Text style={styles.fieldLabel}>Location Type *</Text>
+              <View style={styles.optionRow}>
+                {LOCATION_TYPES.map((type) => {
+                  const active = formLocationType === type.value;
+                  return (
+                    <TouchableOpacity
+                      key={type.value}
+                      style={[
+                        styles.optionChip,
+                        active && styles.optionChipActive,
+                      ]}
+                      onPress={() => handleLocationTypeChange(type.value)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={type.icon}
+                        size={16}
+                        color={active ? "#FFFFFF" : "#64748B"}
+                      />
+                      <Text
+                        style={[
+                          styles.optionChipText,
+                          active && styles.optionChipTextActive,
+                        ]}
+                      >
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TextInput
+                style={styles.formInput}
+                placeholder={activeLocation?.placeholder}
+                placeholderTextColor="#94A3B8"
+                value={formLocationDetails}
+                onChangeText={setFormLocationDetails}
+                autoCapitalize="none"
+                keyboardType={
+                  formLocationType === "phone"
+                    ? "phone-pad"
+                    : formLocationType === "virtual"
+                      ? "url"
+                      : "default"
+                }
+              />
 
-            <TextInput
-              style={[styles.formInput, styles.textArea]}
-              placeholder="Program Description"
-              placeholderTextColor="#94A3B8"
-              multiline
-              numberOfLines={3}
-              value={formDescription}
-              onChangeText={setFormDescription}
-            />
+              {/* Payment */}
+              <Text style={styles.fieldLabel}>Attendance Fee *</Text>
+              <View style={styles.optionRow}>
+                {[
+                  { label: "Free", value: false, icon: "gift-outline" },
+                  { label: "Paid", value: true, icon: "cash-outline" },
+                ].map((option) => {
+                  const active = formIsPaid === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.label}
+                      style={[
+                        styles.optionChip,
+                        active && styles.optionChipActive,
+                      ]}
+                      onPress={() => {
+                        setFormIsPaid(option.value);
+                        if (!option.value) setFormAmount("");
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={option.icon}
+                        size={16}
+                        color={active ? "#FFFFFF" : "#64748B"}
+                      />
+                      <Text
+                        style={[
+                          styles.optionChipText,
+                          active && styles.optionChipTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {formIsPaid && (
+                <View style={styles.amountRow}>
+                  <View style={styles.currencyBadge}>
+                    <Text style={styles.currencyText}>KES</Text>
+                  </View>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="Amount per participant"
+                    placeholderTextColor="#94A3B8"
+                    value={formAmount}
+                    onChangeText={(text) =>
+                      setFormAmount(text.replace(/[^0-9]/g, ""))
+                    }
+                    keyboardType="numeric"
+                    maxLength={7}
+                  />
+                </View>
+              )}
+
+              {/* Description */}
+              <Text style={styles.fieldLabel}>Description</Text>
+              <TextInput
+                style={[styles.formInput, styles.textArea]}
+                placeholder="What will this program cover?"
+                placeholderTextColor="#94A3B8"
+                multiline
+                numberOfLines={3}
+                value={formDescription}
+                onChangeText={setFormDescription}
+              />
+
+              {/* Poster */}
+              <Text style={styles.fieldLabel}>Event Poster (optional)</Text>
+              {formPoster ? (
+                <View style={styles.posterPreviewWrap}>
+                  <Image
+                    source={{ uri: formPoster.uri }}
+                    style={styles.posterPreview}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.posterActions}>
+                    <TouchableOpacity
+                      style={styles.posterActionBtn}
+                      onPress={handlePickPoster}
+                    >
+                      <Ionicons name="swap-horizontal" size={16} color="#FFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.posterActionBtn}
+                      onPress={() => setFormPoster(null)}
+                    >
+                      <Ionicons name="close" size={16} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.posterPicker}
+                  onPress={handlePickPoster}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="image-outline" size={28} color="#94A3B8" />
+                  <Text style={styles.posterPickerText}>Add poster image</Text>
+                  <Text style={styles.posterHint}>
+                    JPG, PNG or WebP · max 5MB
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Moderators */}
+              <Text style={styles.fieldLabel}>
+                Number of Invigilators / Moderators
+              </Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder={`0 to ${MAX_MODERATORS}`}
+                placeholderTextColor="#94A3B8"
+                value={formModeratorCount}
+                onChangeText={handleModeratorCountChange}
+                keyboardType="number-pad"
+                maxLength={2}
+              />
+
+              {formModerators.map((moderator, index) => (
+                <View key={index} style={styles.moderatorCard}>
+                  <Text style={styles.moderatorTitle}>
+                    Moderator {index + 1}
+                  </Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Full name"
+                    placeholderTextColor="#94A3B8"
+                    value={moderator.name}
+                    onChangeText={(text) =>
+                      updateModerator(index, "name", text)
+                    }
+                  />
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Email address"
+                    placeholderTextColor="#94A3B8"
+                    value={moderator.email}
+                    onChangeText={(text) =>
+                      updateModerator(index, "email", text)
+                    }
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  <TextInput
+                    style={[styles.formInput, styles.lastInput]}
+                    placeholder="Phone number"
+                    placeholderTextColor="#94A3B8"
+                    value={moderator.phone}
+                    onChangeText={(text) =>
+                      updateModerator(index, "phone", text)
+                    }
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              ))}
+            </ScrollView>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.cancelBtn}
                 onPress={() => setIsProgramModalOpen(false)}
+                disabled={saving}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.saveBtn}
+                style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
                 onPress={handleSaveProgram}
+                disabled={saving}
               >
-                <Text style={styles.saveBtnText}>Save Program</Text>
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save Program</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -494,22 +1099,78 @@ export default function Programs() {
 
 // Sub-component for Program Cards
 function ProgramCard({ program, onEdit, onDelete, onViewParticipants }) {
+  const location = LOCATION_TYPES.find((l) => l.value === program.locationType);
+
   return (
     <View style={styles.programCard}>
+      {program.posterUrl ? (
+        <Image
+          source={{ uri: program.posterUrl }}
+          style={styles.posterThumb}
+          resizeMode="cover"
+        />
+      ) : null}
+
       <View style={styles.cardTop}>
         <View style={styles.categoryBadge}>
           <Text style={styles.categoryText}>{program.category}</Text>
         </View>
-        <Text style={styles.dateText}>{program.date}</Text>
+        <Text style={styles.dateText}>{formatDateTime(program.startsAt)}</Text>
       </View>
 
       <Text style={styles.programTitle}>{program.title}</Text>
-      <Text style={styles.locationText}>📍 {program.location}</Text>
-      <Text style={styles.descriptionText} numberOfLines={2}>
-        {program.description}
-      </Text>
 
-      {/* Card Buttons */}
+      <View style={styles.metaRow}>
+        <Ionicons name={location?.icon} size={15} color="#475569" />
+        <Text style={styles.locationText} numberOfLines={1}>
+          {location?.label}: {program.locationDetails}
+        </Text>
+      </View>
+
+      <View style={styles.tagRow}>
+        <View
+          style={[styles.tag, program.isPaid ? styles.paidTag : styles.freeTag]}
+        >
+          <Ionicons
+            name={program.isPaid ? "cash-outline" : "gift-outline"}
+            size={12}
+            color={program.isPaid ? "#B45309" : "#15803D"}
+          />
+          <Text
+            style={[
+              styles.tagText,
+              program.isPaid ? styles.paidTagText : styles.freeTagText,
+            ]}
+          >
+            {program.isPaid
+              ? `${program.currency} ${Number(program.amount).toLocaleString()}`
+              : "Free"}
+          </Text>
+        </View>
+
+        {program.moderators.length > 0 && (
+          <View style={[styles.tag, styles.infoTag]}>
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={12}
+              color="#475569"
+            />
+            <Text style={[styles.tagText, styles.infoTagText]}>
+              {program.moderators.length}{" "}
+              {program.moderators.length === 1 ? "moderator" : "moderators"}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {program.description ? (
+        <Text style={styles.descriptionText} numberOfLines={2}>
+          {program.description}
+        </Text>
+      ) : (
+        <View style={{ height: 8 }} />
+      )}
+
       <View style={styles.cardActions}>
         <TouchableOpacity
           style={styles.viewParticipantsBtn}

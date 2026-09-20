@@ -70,9 +70,11 @@ export default function NewAppointmentScreen() {
 
   // UI Modals
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [session, setSession] = useState(null);
 
   useEffect(() => {
     fetchCounselors();
+    fetchSystemSettings();
     loadDraft();
   }, []);
 
@@ -94,6 +96,24 @@ export default function NewAppointmentScreen() {
     selectedDate,
     isDraftRestored,
   ]);
+
+  const fetchSystemSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "session_pricing")
+        .single();
+
+      if (error) throw error;
+
+      if (data?.value) {
+        setSession(data.value);
+      }
+    } catch (err) {
+      console.error("Error fetching system settings:", err);
+    }
+  };
 
   // Fetch Counselors matching role='counselor' AND approved=true AND suspended=false
   const fetchCounselors = async () => {
@@ -346,8 +366,8 @@ export default function NewAppointmentScreen() {
         had_therapy_before: hadTherapyBefore,
         agreed_terms: agreedTerms,
         payment_status: isPaid ? "completed" : "pending",
-        payment_amount: 2000.0,
-        currency: "KES",
+        payment_amount: session?.amount ? Number(session.amount) : 0,
+        currency: session?.currency || "KES",
         mpesa_transaction_reference: mpesaRef || null,
         scheduled_start_time: startTime.toISOString(),
         scheduled_end_time: endTime.toISOString(),
@@ -711,7 +731,10 @@ export default function NewAppointmentScreen() {
               </Text>
 
               <View style={styles.priceBadge}>
-                <Text style={styles.priceText}>KES 2,000</Text>
+                <Text style={styles.priceText}>
+                  {session?.currency || "KES"}{" "}
+                  {session?.amount ? session.amount.toLocaleString() : "..."}
+                </Text>
                 <Text style={styles.priceSub}>
                   Per standard 50-minute session
                 </Text>
@@ -733,7 +756,7 @@ export default function NewAppointmentScreen() {
             <View style={styles.card}>
               <Text style={styles.stepTitle}>Select Counselor</Text>
               <Text style={styles.stepSubtitle}>
-                Choose an approved specialist for your sessions.
+                Choose a specialist for your sessions.
               </Text>
 
               {fetchingCounselors ? (

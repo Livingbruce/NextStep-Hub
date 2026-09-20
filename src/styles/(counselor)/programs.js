@@ -37,6 +37,9 @@ export const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
   },
+  loader: {
+    marginTop: 40,
+  },
   section: {
     marginBottom: 24,
   },
@@ -66,6 +69,13 @@ export const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  posterThumb: {
+    width: "100%",
+    height: 150,
+    borderRadius: 10,
+    marginBottom: 12,
+    backgroundColor: "#E2E8F0",
+  },
   cardTop: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -77,6 +87,8 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
+    flexShrink: 1,
+    marginRight: 8,
   },
   categoryText: {
     fontSize: 12,
@@ -91,12 +103,54 @@ export const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
     color: "#0F172A",
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
   },
   locationText: {
+    flex: 1,
     fontSize: 13,
     color: "#475569",
-    marginBottom: 6,
+  },
+  tagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
+  },
+  tag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  freeTag: {
+    backgroundColor: "#DCFCE7",
+  },
+  freeTagText: {
+    color: "#15803D",
+  },
+  paidTag: {
+    backgroundColor: "#FEF3C7",
+  },
+  paidTagText: {
+    color: "#B45309",
+  },
+  infoTag: {
+    backgroundColor: "#F1F5F9",
+  },
+  infoTagText: {
+    color: "#475569",
   },
   descriptionText: {
     fontSize: 13,
@@ -277,12 +331,22 @@ export const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 20,
+    maxHeight: "90%",
   },
   formModalTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: "#0F172A",
     marginBottom: 16,
+  },
+  formScroll: {
+    flexGrow: 0,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#334155",
+    marginBottom: 6,
   },
   formInput: {
     borderWidth: 1,
@@ -291,18 +355,172 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
+    color: "#0F172A",
     backgroundColor: "#F8FAFC",
     marginBottom: 12,
+  },
+  lastInput: {
+    marginBottom: 0,
   },
   textArea: {
     height: 80,
     textAlignVertical: "top",
   },
+
+  // Date & time
+  dateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#F8FAFC",
+    marginBottom: 12,
+  },
+  dateButtonText: {
+    fontSize: 14,
+    color: "#0F172A",
+  },
+  iosPickerRow: {
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+
+  // Option chips (location type, free/paid)
+  optionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  optionChip: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  optionChipActive: {
+    backgroundColor: "#16A34A",
+    borderColor: "#16A34A",
+  },
+  optionChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  optionChipTextActive: {
+    color: "#FFFFFF",
+  },
+
+  // Amount
+  amountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#F8FAFC",
+    marginBottom: 12,
+  },
+  currencyBadge: {
+    backgroundColor: "#E2E8F0",
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderRightWidth: 1,
+    borderRightColor: "#CBD5E1",
+  },
+  currencyText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E3A8A",
+  },
+  amountInput: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#0F172A",
+  },
+
+  // Poster
+  posterPicker: {
+    height: 110,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "#CBD5E1",
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F8FAFC",
+    marginBottom: 12,
+    gap: 4,
+  },
+  posterPickerText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  posterHint: {
+    fontSize: 11,
+    color: "#94A3B8",
+  },
+  posterPreviewWrap: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  posterPreview: {
+    width: "100%",
+    height: 170,
+    borderRadius: 10,
+    backgroundColor: "#E2E8F0",
+  },
+  posterActions: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    flexDirection: "row",
+    gap: 8,
+  },
+  posterActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(15, 23, 42, 0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Moderators
+  moderatorCard: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  moderatorTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E3A8A",
+    marginBottom: 8,
+  },
+
+  // Footer buttons
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 10,
-    marginTop: 8,
+    marginTop: 12,
   },
   cancelBtn: {
     paddingVertical: 10,
@@ -318,6 +536,11 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
+    minWidth: 110,
+    alignItems: "center",
+  },
+  saveBtnDisabled: {
+    opacity: 0.6,
   },
   saveBtnText: {
     color: "#FFFFFF",

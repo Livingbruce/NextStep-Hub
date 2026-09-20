@@ -8,8 +8,10 @@ export const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
+
+  // Header
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -23,115 +25,121 @@ export const styles = StyleSheet.create({
   },
   adminTitle: {
     fontSize: 22,
-    fontWeight: "800",
+    fontWeight: "700",
     color: "#0F172A",
+    marginTop: 2,
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
   },
   iconButton: {
-    position: "relative",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "#FFFFFF",
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    position: "relative",
   },
   notificationDot: {
     position: "absolute",
-    top: 9,
-    right: 10,
+    top: 10,
+    right: 11,
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: "#EF4444",
   },
   logoutButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "#FEF2F2",
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: "#FCA5A5",
+    borderColor: "#FEE2E2",
   },
+
+  // Section Headers
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: "#0F172A",
-    marginBottom: 12,
+    marginBottom: 14,
   },
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 14,
   },
   seeAllText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
-    color: "#1E3A8A",
+    color: "#2563EB",
   },
+
+  // Shortcuts Grid
   shortcutsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 20,
+    gap: 12,
   },
   shortcutCard: {
     width: "48%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
     padding: 14,
-    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 2,
+    elevation: 1,
   },
   iconBackground: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: "center",
+    alignItems: "center",
   },
   shortcutTitle: {
-    flex: 1,
     fontSize: 13,
     fontWeight: "600",
     color: "#1E293B",
-    marginLeft: 10,
-    marginRight: 4,
+    flex: 1,
+    marginHorizontal: 8,
   },
+
+  // Events / Programs Horizontal List
   eventsList: {
     paddingRight: 20,
+    gap: 14,
     marginBottom: 20,
   },
   eventCard: {
-    width: 240,
+    width: 250,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 16,
-    marginRight: 12,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    shadowColor: "#0F172A",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -144,77 +152,179 @@ export const styles = StyleSheet.create({
   eventCategory: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#1E3A8A",
+    color: "#2563EB",
     textTransform: "uppercase",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   dateBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#F1F5F9",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
   },
   dateBadgeText: {
     fontSize: 11,
-    fontWeight: "600",
-    color: "#475569",
+    color: "#64748B",
+    fontWeight: "500",
   },
   eventTitle: {
     fontSize: 15,
     fontWeight: "700",
     color: "#0F172A",
+    lineHeight: 20,
     marginBottom: 12,
   },
   eventFooter: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+    paddingTop: 10,
   },
   eventLocation: {
     fontSize: 12,
     color: "#64748B",
+    flex: 1,
   },
+
+  // App Logs / Recent Actions
   actionsContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
+  actionCard: {
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
   },
-  actionIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "#EFF6FF",
+  actionCardLast: {
+    borderBottomWidth: 0,
+  },
+
+  // Action Header (User Info + Status Badge)
+  actionTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  actionUserInfo: {
+    flexDirection: "row",
     alignItems: "center",
+    flex: 1, // Restricts user details so badge isn't pushed off-screen
+    marginRight: 6,
+  },
+  actionIconContainer: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#EFF6FF",
     justifyContent: "center",
-    marginRight: 12,
+    alignItems: "center",
+    marginRight: 10,
   },
-  actionContent: {
-    flex: 1,
+  actionTextContainer: {
+    flex: 1, // Ensures name & email truncate cleanly with '...'
   },
-  actionTitle: {
+  actionNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  actionPerson: {
     fontSize: 14,
     fontWeight: "600",
     color: "#0F172A",
+    flexShrink: 1, // Crucial: lets text shrink if name is too long
   },
-  actionDetails: {
+  roleBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  actionEmail: {
     fontSize: 12,
     color: "#64748B",
-    marginTop: 2,
+    marginTop: 1,
+  },
+
+  // Right side action status pill
+  actionBadge: {
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    maxWidth: "40%",
+  },
+  actionBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#334155",
+    textAlign: "right",
+  },
+
+  // Action Details & Time
+  actionBottomRow: {
+    marginTop: 8,
+    paddingLeft: 44, // Align with text under icon
+  },
+  actionDetailsText: {
+    fontSize: 13,
+    color: "#334155",
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  actionMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   actionTime: {
     fontSize: 11,
     color: "#94A3B8",
     fontWeight: "500",
+  },
+
+  // Empty & Loading States
+  loadingContainer: {
+    paddingVertical: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 20,
+  },
+  emptyActions: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  emptyCardText: {
+    fontSize: 13,
+    color: "#94A3B8",
+    marginTop: 8,
+    textAlign: "center",
   },
 });

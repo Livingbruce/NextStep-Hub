@@ -104,6 +104,13 @@ export default function ClientLayout() {
           tabBarStyle: { display: "none" },
         }}
       />
+      <Tabs.Screen
+        name="programs/regPrograms"
+        options={{
+          href: null,
+          tabBarStyle: { display: "none" },
+        }}
+      />
     </Tabs>
   );
 }
