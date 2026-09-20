@@ -27,9 +27,55 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const router = useRouter();
 
+  // Traps all raw errors and converts them to user-friendly messages
+  const getFriendlyErrorMessage = (error) => {
+    if (!error) return "An unexpected error occurred. Please try again.";
+
+    const msg = (error.message || "").toLowerCase();
+    const status = error.status;
+
+    // Network / Connectivity Issues
+    if (
+      msg.includes("fetch") ||
+      msg.includes("network") ||
+      msg.includes("connection") ||
+      msg.includes("timeout") ||
+      status === 0
+    ) {
+      return "Network connection issue. Please check your internet and try again.";
+    }
+
+    // Invalid Credentials
+    if (
+      msg.includes("invalid login credentials") ||
+      msg.includes("invalid_credentials")
+    ) {
+      return "Incorrect email or password. Please check your credentials and try again.";
+    }
+
+    // Unconfirmed Email
+    if (msg.includes("email not confirmed")) {
+      return "Your email address has not been verified yet. Please check your inbox.";
+    }
+
+    // Rate Limiting
+    if (msg.includes("too many requests") || status === 429) {
+      return "Too many sign-in attempts. Please wait a moment and try again.";
+    }
+
+    // Fallback for custom or unhandled error messages
+    return (
+      error.message ||
+      "Something went wrong while signing in. Please try again."
+    );
+  };
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Invalid Input", "Please provide both email and password.");
+    if (!email.trim() || !password) {
+      Alert.alert(
+        "Missing Details",
+        "Please enter both your email address and password.",
+      );
       return;
     }
 
@@ -37,46 +83,44 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // 1. Authenticate credentials against Supabase Auth
+      // 1. Authenticate against Supabase Auth
       const { data: authData, error: authError } =
         await supabase.auth.signInWithPassword({
           email: cleanEmail,
           password: password,
         });
 
-      if (authError || !authData.user) {
-        Alert.alert(
-          "Sign In Failed",
-          "Invalid email or password. Please check your credentials and try again.",
+      if (authError) throw authError;
+
+      if (!authData?.user) {
+        throw new Error(
+          "Unable to locate account details. Please try signing in again.",
         );
-        setLoading(false);
-        return;
       }
 
-      // 2. Fetch user's actual profile & assigned role directly from Supabase
+      // 2. Fetch user's profile and role
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role, id, full_name")
         .eq("id", authData.user.id)
         .single();
 
-      if (profileError || !profile) {
-        Alert.alert(
-          "Account Error",
-          "Unable to load profile settings. Please try again or contact support.",
-        );
+      if (profileError) throw profileError;
+
+      if (!profile) {
         await supabase.auth.signOut();
-        setLoading(false);
-        return;
+        throw new Error("Profile record not found. Please contact support.");
       }
 
-      // 3. Authenticate context with dynamically fetched profile role
+      // 3. Complete authentication flow
       login(cleanEmail, profile.role, profile);
     } catch (err) {
-      Alert.alert(
-        "Connection Error",
-        "An unexpected error occurred. Please check your connection and try again.",
-      );
+      const friendlyMessage = getFriendlyErrorMessage(err);
+
+      Alert.alert("Unable to Sign In", friendlyMessage, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Try Again", onPress: handleLogin },
+      ]);
     } finally {
       setLoading(false);
     }
