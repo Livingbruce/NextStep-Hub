@@ -1,9 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -13,7 +16,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../../../libs/supabase";
 import { styles } from "../../../styles/(client)/appointments/newAppointments";
+
+const STORAGE_KEY = "@booking_draft_v1";
 
 const COUNSELING_TYPES = [
   "Individual",
@@ -36,18 +42,15 @@ const REASONS = [
   "Other",
 ];
 
-const COUNSELORS = [
-  {
-    id: "lucy",
-    name: "Counselor Lucy",
-    specialty: "Mental Health & Relationships",
-  },
-  { id: "john", name: "Counselor John", specialty: "Career & Transitions" },
-];
-
 export default function NewAppointmentScreen() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [fetchingCounselors, setFetchingCounselors] = useState(true);
+  const [isDraftRestored, setIsDraftRestored] = useState(false);
+
+  // Dynamic Counselor Data from Database
+  const [counselors, setCounselors] = useState([]);
 
   // Form States
   const [counselingType, setCounselingType] = useState("");
@@ -57,7 +60,8 @@ export default function NewAppointmentScreen() {
   const [hadTherapyBefore, setHadTherapyBefore] = useState(null);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
-  const [selectedCounselor, setSelectedCounselor] = useState("");
+  const [selectedCounselorId, setSelectedCounselorId] = useState("");
+  const [mpesaRef, setMpesaRef] = useState("");
 
   // Date & Time Picker States
   const [selectedDate, setSelectedDate] = useState(null);
@@ -67,6 +71,131 @@ export default function NewAppointmentScreen() {
   // UI Modals
   const [showTermsModal, setShowTermsModal] = useState(false);
 
+  useEffect(() => {
+    fetchCounselors();
+    loadDraft();
+  }, []);
+
+  useEffect(() => {
+    if (!isDraftRestored) return;
+    if (step === 11) return;
+    saveDraft();
+  }, [
+    step,
+    counselingType,
+    selectedReasons,
+    otherReason,
+    goals,
+    hadTherapyBefore,
+    agreedTerms,
+    isPaid,
+    selectedCounselorId,
+    mpesaRef,
+    selectedDate,
+    isDraftRestored,
+  ]);
+
+  // Fetch Counselors matching role='counselor' AND approved=true AND suspended=false
+  const fetchCounselors = async () => {
+    try {
+      setFetchingCounselors(true);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "id, first_name, surname, specializations, about, years_of_experience, avatar_url, role, absent_days",
+        )
+        .eq("role", "Counselor")
+        .eq("approved", true)
+        .eq("suspended", false);
+
+      if (error) throw error;
+      setCounselors(data || []);
+    } catch (err) {
+      console.error("Error fetching counselors:", err);
+      Alert.alert("Error", "Could not load counselors list.");
+    } finally {
+      setFetchingCounselors(false);
+    }
+  };
+
+  const loadDraft = async () => {
+    try {
+      const savedDraft = await AsyncStorage.getItem(STORAGE_KEY);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.step && parsed.step < 11) setStep(parsed.step);
+        if (parsed.counselingType) setCounselingType(parsed.counselingType);
+        if (parsed.selectedReasons) setSelectedReasons(parsed.selectedReasons);
+        if (parsed.otherReason) setOtherReason(parsed.otherReason);
+        if (parsed.goals) setGoals(parsed.goals);
+        if (parsed.hadTherapyBefore !== undefined)
+          setHadTherapyBefore(parsed.hadTherapyBefore);
+        if (parsed.agreedTerms !== undefined)
+          setAgreedTerms(parsed.agreedTerms);
+        if (parsed.isPaid !== undefined) setIsPaid(parsed.isPaid);
+        if (parsed.selectedCounselorId)
+          setSelectedCounselorId(parsed.selectedCounselorId);
+        if (parsed.mpesaRef) setMpesaRef(parsed.mpesaRef);
+        if (parsed.selectedDate) setSelectedDate(new Date(parsed.selectedDate));
+      }
+    } catch (err) {
+      console.error("Failed to load booking draft:", err);
+    } finally {
+      setIsDraftRestored(true);
+    }
+  };
+
+  const saveDraft = async () => {
+    try {
+      const draftData = {
+        step,
+        counselingType,
+        selectedReasons,
+        otherReason,
+        goals,
+        hadTherapyBefore,
+        agreedTerms,
+        isPaid,
+        selectedCounselorId,
+        mpesaRef,
+        selectedDate: selectedDate ? selectedDate.toISOString() : null,
+      };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(draftData));
+    } catch (err) {
+      console.error("Failed to save booking draft:", err);
+    }
+  };
+
+  const clearDraft = async () => {
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      setStep(1);
+      setCounselingType("");
+      setSelectedReasons([]);
+      setOtherReason("");
+      setGoals("");
+      setHadTherapyBefore(null);
+      setAgreedTerms(false);
+      setIsPaid(false);
+      setSelectedCounselorId("");
+      setMpesaRef("");
+      setSelectedDate(null);
+    } catch (err) {
+      console.error("Failed to clear booking draft:", err);
+    }
+  };
+
+  const handleClearDraftClick = () => {
+    Alert.alert(
+      "Clear Draft",
+      "Are you sure you want to reset all entered information and start over?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Reset Form", style: "destructive", onPress: clearDraft },
+      ],
+    );
+  };
+
   const toggleReason = (item) => {
     if (selectedReasons.includes(item)) {
       setSelectedReasons((prev) => prev.filter((r) => r !== item));
@@ -75,9 +204,27 @@ export default function NewAppointmentScreen() {
     }
   };
 
+  // Helper to format Date to YYYY-MM-DD
+  const formatDateToISO = (date) => {
+    if (!date) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Check counselor absent list
+  const isCounselorAbsent = (date, counselorId) => {
+    if (!date || !counselorId) return false;
+    const counselor = counselors.find((c) => c.id === counselorId);
+    if (!counselor || !Array.isArray(counselor.absent_days)) return false;
+
+    const dateString = formatDateToISO(date);
+    return counselor.absent_days.includes(dateString);
+  };
+
   const validateWorkingHours = (date) => {
     const day = date.getDay();
-    // 0 = Sunday, 6 = Saturday
     if (day === 0 || day === 6) {
       Alert.alert(
         "Invalid Selection",
@@ -110,32 +257,117 @@ export default function NewAppointmentScreen() {
     return true;
   };
 
-  const handleDateChange = (event, date) => {
-    if (Platform.OS === "android") setShowDatePicker(false);
-    if (date) {
-      const day = date.getDay();
-      if (day === 0 || day === 6) {
-        Alert.alert(
-          "Weekend Selected",
-          "Appointments can only be scheduled Monday to Friday.",
-        );
-        return;
-      }
-      const newDate = selectedDate ? new Date(selectedDate) : new Date();
-      newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
-      setSelectedDate(newDate);
+  const handleDateValueChange = (event, selectedValue) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+    }
+
+    if (!selectedValue) return;
+
+    const day = selectedValue.getDay();
+    if (day === 0 || day === 6) {
+      Alert.alert(
+        "Weekend Selected",
+        "Appointments can only be scheduled Monday to Friday.",
+      );
+      return;
+    }
+
+    if (isCounselorAbsent(selectedValue, selectedCounselorId)) {
+      Alert.alert(
+        "Counselor Unavailable",
+        "The selected counselor is marked as absent on this date. Please pick another date.",
+      );
+      return;
+    }
+
+    const baseDate = selectedDate ? new Date(selectedDate) : new Date();
+    baseDate.setFullYear(
+      selectedValue.getFullYear(),
+      selectedValue.getMonth(),
+      selectedValue.getDate(),
+    );
+    setSelectedDate(baseDate);
+  };
+
+  const handleTimeValueChange = (event, selectedValue) => {
+    if (Platform.OS === "android") {
+      setShowTimePicker(false);
+    }
+
+    if (!selectedValue) return;
+
+    const baseDate = selectedDate ? new Date(selectedDate) : new Date();
+    baseDate.setHours(
+      selectedValue.getHours(),
+      selectedValue.getMinutes(),
+      0,
+      0,
+    );
+
+    if (validateWorkingHours(baseDate)) {
+      setSelectedDate(baseDate);
     }
   };
 
-  const handleTimeChange = (event, time) => {
-    if (Platform.OS === "android") setShowTimePicker(false);
-    if (time) {
-      const newDate = selectedDate ? new Date(selectedDate) : new Date();
-      newDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
+  const handlePickerDismiss = () => {
+    setShowDatePicker(false);
+    setShowTimePicker(false);
+  };
 
-      if (validateWorkingHours(newDate)) {
-        setSelectedDate(newDate);
+  const handleSubmitBooking = async () => {
+    try {
+      setLoading(true);
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        Alert.alert(
+          "Authentication Error",
+          "Please sign in to make a booking.",
+        );
+        setLoading(false);
+        return;
       }
+
+      const startTime = new Date(selectedDate);
+      const endTime = new Date(startTime.getTime() + 50 * 60000);
+
+      const payload = {
+        client_id: user.id,
+        counselor_id: selectedCounselorId,
+        counseling_type: counselingType,
+        reasons: selectedReasons,
+        other_reason: selectedReasons.includes("Other") ? otherReason : null,
+        session_goals: goals,
+        had_therapy_before: hadTherapyBefore,
+        agreed_terms: agreedTerms,
+        payment_status: isPaid ? "completed" : "pending",
+        payment_amount: 2000.0,
+        currency: "KES",
+        mpesa_transaction_reference: mpesaRef || null,
+        scheduled_start_time: startTime.toISOString(),
+        scheduled_end_time: endTime.toISOString(),
+        status: isPaid ? "scheduled" : "pending_payment",
+      };
+
+      const { error } = await supabase.from("appointments").insert([payload]);
+
+      if (error) throw error;
+
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      setStep(11);
+    } catch (err) {
+      console.error("Booking Error:", err);
+      Alert.alert(
+        "Submission Error",
+        err.message || "Failed to create appointment.",
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -158,10 +390,19 @@ export default function NewAppointmentScreen() {
         "Required",
         "You must agree to the Terms and Conditions.",
       );
-    if (step === 7 && !selectedCounselor)
+    if (step === 7 && !selectedCounselorId)
       return Alert.alert("Required", "Please select a counselor.");
-    if (step === 8 && !selectedDate)
-      return Alert.alert("Required", "Please select a preferred date.");
+    if (step === 8) {
+      if (!selectedDate) {
+        return Alert.alert("Required", "Please select a preferred date.");
+      }
+      if (isCounselorAbsent(selectedDate, selectedCounselorId)) {
+        return Alert.alert(
+          "Counselor Unavailable",
+          "The counselor will not be available on this date. Please pick another date.",
+        );
+      }
+    }
     if (step === 9) {
       if (!selectedDate) {
         return Alert.alert("Required", "Please select a preferred time.");
@@ -170,6 +411,9 @@ export default function NewAppointmentScreen() {
         return;
       }
     }
+    if (step === 10) {
+      return handleSubmitBooking();
+    }
 
     setStep((prev) => Math.min(prev + 1, 11));
   };
@@ -177,10 +421,23 @@ export default function NewAppointmentScreen() {
   const handlePrev = () => setStep((prev) => Math.max(prev - 1, 1));
 
   const handlePayment = () => {
+    const mockRef = `MX${Math.floor(100000 + Math.random() * 900000)}`;
+    setMpesaRef(mockRef);
     setIsPaid(true);
-    Alert.alert("Payment Successful", "Your transaction has been recorded.");
+    Alert.alert("Payment Received", `Transaction Ref: ${mockRef}`);
     setStep(7);
   };
+
+  const handleExitOrClose = async () => {
+    if (step === 11) {
+      await clearDraft();
+    }
+    router.back();
+  };
+
+  const selectedCounselorObj = counselors.find(
+    (c) => c.id === selectedCounselorId,
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -190,7 +447,7 @@ export default function NewAppointmentScreen() {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() =>
-              step > 1 && step < 11 ? handlePrev() : router.back()
+              step > 1 && step < 11 ? handlePrev() : handleExitOrClose()
             }
             activeOpacity={0.7}
           >
@@ -199,7 +456,23 @@ export default function NewAppointmentScreen() {
               {step === 1 || step === 11 ? "Close" : "Back"}
             </Text>
           </TouchableOpacity>
+
           <Text style={styles.headerTitle}>New Booking</Text>
+
+          {step <= 10 ? (
+            <TouchableOpacity
+              onPress={handleClearDraftClick}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={{ color: "#DC2626", fontWeight: "600", fontSize: 13 }}
+              >
+                Clear Draft
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 60 }} />
+          )}
         </View>
 
         {/* Step Indicator */}
@@ -460,46 +733,109 @@ export default function NewAppointmentScreen() {
             <View style={styles.card}>
               <Text style={styles.stepTitle}>Select Counselor</Text>
               <Text style={styles.stepSubtitle}>
-                Choose a specialist for your sessions.
+                Choose an approved specialist for your sessions.
               </Text>
-              <View style={styles.optionsGrid}>
-                {COUNSELORS.map((c) => (
-                  <TouchableOpacity
-                    key={c.id}
-                    style={[
-                      styles.optionCard,
-                      selectedCounselor === c.name && styles.optionCardSelected,
-                    ]}
-                    onPress={() => setSelectedCounselor(c.name)}
-                  >
-                    <Ionicons
-                      name={
-                        selectedCounselor === c.name
-                          ? "radio-button-on"
-                          : "radio-button-off"
-                      }
-                      size={20}
-                      color={
-                        selectedCounselor === c.name ? "#936D9A" : "#94A3B8"
-                      }
-                    />
-                    <View>
-                      <Text
+
+              {fetchingCounselors ? (
+                <ActivityIndicator
+                  size="large"
+                  color="#936D9A"
+                  style={{ marginVertical: 20 }}
+                />
+              ) : counselors.length === 0 ? (
+                <Text style={{ color: "#64748B", marginVertical: 20 }}>
+                  No available counselors found. Please check back later.
+                </Text>
+              ) : (
+                <View style={styles.optionsGrid}>
+                  {counselors.map((c) => {
+                    const isSelected = selectedCounselorId === c.id;
+                    const fullName =
+                      `Counselor ${c.first_name || ""} ${c.surname || ""}`.trim();
+
+                    const formattedSpecs =
+                      Array.isArray(c.specializations) &&
+                      c.specializations.length > 0
+                        ? c.specializations.join(" • ")
+                        : "General Counseling";
+
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
                         style={[
-                          styles.optionText,
-                          selectedCounselor === c.name &&
-                            styles.optionTextSelected,
+                          styles.counselorCard,
+                          isSelected && styles.optionCardSelected,
                         ]}
+                        onPress={() => setSelectedCounselorId(c.id)}
+                        activeOpacity={0.85}
                       >
-                        {c.name}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: "#64748B" }}>
-                        {c.specialty}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                        <Ionicons
+                          name={
+                            isSelected ? "radio-button-on" : "radio-button-off"
+                          }
+                          size={22}
+                          color={isSelected ? "#936D9A" : "#94A3B8"}
+                          style={{ marginTop: 2 }}
+                        />
+
+                        <View style={styles.counselorInfoContainer}>
+                          <Text
+                            style={[
+                              styles.counselorName,
+                              isSelected && styles.optionTextSelected,
+                            ]}
+                          >
+                            {fullName}
+                          </Text>
+
+                          {c.years_of_experience != null && (
+                            <Text style={styles.counselorExp}>
+                              {c.years_of_experience}{" "}
+                              {c.years_of_experience === 1 ? "year" : "years"}{" "}
+                              of experience
+                            </Text>
+                          )}
+
+                          <Text style={styles.counselorSpec} numberOfLines={2}>
+                            {formattedSpecs}
+                          </Text>
+
+                          {c.about ? (
+                            <Text
+                              style={styles.counselorAbout}
+                              numberOfLines={2}
+                            >
+                              {c.about}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.avatarWrapper}>
+                          {c.avatar_url ? (
+                            <Image
+                              source={{ uri: c.avatar_url }}
+                              style={styles.counselorAvatar}
+                            />
+                          ) : (
+                            <View
+                              style={[
+                                styles.counselorAvatar,
+                                styles.avatarFallback,
+                              ]}
+                            >
+                              <Ionicons
+                                name="person"
+                                size={24}
+                                color="#936D9A"
+                              />
+                            </View>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           )}
 
@@ -521,13 +857,13 @@ export default function NewAppointmentScreen() {
                 </Text>
               </TouchableOpacity>
 
-              {(showDatePicker || Platform.OS === "ios") && (
+              {showDatePicker && (
                 <DateTimePicker
                   value={selectedDate || new Date()}
                   mode="date"
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  minimumDate={new Date()}
-                  onChange={handleDateChange}
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  onValueChange={handleDateValueChange}
+                  onDismiss={handlePickerDismiss}
                 />
               )}
             </View>
@@ -554,12 +890,13 @@ export default function NewAppointmentScreen() {
                 </Text>
               </TouchableOpacity>
 
-              {(showTimePicker || Platform.OS === "ios") && (
+              {showTimePicker && (
                 <DateTimePicker
                   value={selectedDate || new Date()}
                   mode="time"
                   display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={handleTimeChange}
+                  onValueChange={handleTimeValueChange}
+                  onDismiss={handlePickerDismiss}
                 />
               )}
             </View>
@@ -587,7 +924,11 @@ export default function NewAppointmentScreen() {
               </View>
               <View style={styles.reviewRow}>
                 <Text style={styles.reviewLabel}>Counselor</Text>
-                <Text style={styles.reviewValue}>{selectedCounselor}</Text>
+                <Text style={styles.reviewValue}>
+                  {selectedCounselorObj
+                    ? `${selectedCounselorObj.first_name} ${selectedCounselorObj.surname}`
+                    : "Not Selected"}
+                </Text>
               </View>
               <View style={styles.reviewRow}>
                 <Text style={styles.reviewLabel}>Date & Time</Text>
@@ -607,7 +948,7 @@ export default function NewAppointmentScreen() {
                     { color: isPaid ? "#16A34A" : "#DC2626" },
                   ]}
                 >
-                  {isPaid ? "Paid" : "Pending"}
+                  {isPaid ? `Paid (${mpesaRef})` : "Pending"}
                 </Text>
               </View>
             </View>
@@ -622,17 +963,20 @@ export default function NewAppointmentScreen() {
                 color={isPaid ? "#16A34A" : "#D97706"}
               />
               <Text style={styles.statusTitle}>
-                {isPaid ? "Booking Confirmed!" : "Booking Under Review"}
+                {isPaid ? "Booking Confirmed!" : "Booking Pending"}
               </Text>
               <Text style={styles.statusBody}>
                 {isPaid
                   ? "Your session has been scheduled and paid for. Check your appointments tab for details."
-                  : "Your appointment request has been logged. Pending payment confirmation."}
+                  : "Your appointment request has been logged into the database. Pending payment confirmation."}
               </Text>
 
               <TouchableOpacity
                 style={[styles.navBtn, styles.nextBtn, { width: "100%" }]}
-                onPress={() => router.replace("/appointment")}
+                onPress={async () => {
+                  await clearDraft();
+                  router.replace("/appointment");
+                }}
               >
                 <Text style={styles.nextBtnText}>Return to Appointments</Text>
               </TouchableOpacity>
@@ -646,6 +990,7 @@ export default function NewAppointmentScreen() {
                 <TouchableOpacity
                   style={[styles.navBtn, styles.prevBtn]}
                   onPress={handlePrev}
+                  disabled={loading}
                 >
                   <Text style={styles.prevBtnText}>Previous</Text>
                 </TouchableOpacity>
@@ -654,10 +999,15 @@ export default function NewAppointmentScreen() {
                 <TouchableOpacity
                   style={[styles.navBtn, styles.nextBtn]}
                   onPress={handleNext}
+                  disabled={loading}
                 >
-                  <Text style={styles.nextBtnText}>
-                    {step === 10 ? "Submit Booking" : "Next"}
-                  </Text>
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.nextBtnText}>
+                      {step === 10 ? "Submit Booking" : "Next"}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               )}
             </View>

@@ -5,12 +5,14 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8FAFC",
   },
+
+  // Header
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
@@ -20,15 +22,28 @@ export const styles = StyleSheet.create({
     color: "#64748B",
   },
   welcomeTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
     color: "#0F172A",
   },
-  logoutBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: "#FEE2E2",
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
+  actionIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutBtn: {
+    backgroundColor: "#FEF2F2",
+  },
+
+  // Main Scroll Layout
   scrollContent: {
     padding: 20,
   },
@@ -166,5 +181,23 @@ export const styles = StyleSheet.create({
   detailText: {
     fontSize: 13,
     color: "#475569",
+  },
+
+  // Empty State Fallbacks
+  emptyStateContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 28,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 16,
+    gap: 8,
+  },
+  emptyStateText: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "500",
   },
 });

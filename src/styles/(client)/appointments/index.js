@@ -17,7 +17,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   headerTitle: {
     fontSize: 24,
@@ -31,6 +31,37 @@ export const styles = StyleSheet.create({
     backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  // Tab Filtering Bar
+  tabContainer: {
+    flexDirection: "row",
+    backgroundColor: "#E2E8F0",
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  activeTabButton: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  activeTabText: {
+    color: "#0F172A",
   },
 
   // Appointment List
@@ -55,15 +86,39 @@ export const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   counselorInfo: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
+    marginRight: 8,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E2E8F0",
+  },
+  avatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#936D9A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  counselorTextWrapper: {
+    flexShrink: 1,
   },
   counselorName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     color: "#0F172A",
   },
@@ -78,6 +133,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
+    alignSelf: "flex-start",
   },
   statusText: {
     fontSize: 12,
@@ -106,12 +162,30 @@ export const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  // Expanded Content & Actions
+  // Expanded Content Details & Actions
   expandedContent: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#F1F5F9",
+  },
+  detailBlock: {
+    marginBottom: 8,
+  },
+  detailTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 2,
+  },
+  detailText: {
+    fontSize: 13,
+    color: "#334155",
+  },
+  linkText: {
+    fontSize: 13,
+    color: "#2563EB",
+    textDecorationLine: "underline",
   },
   actionLabel: {
     fontSize: 13,
@@ -180,6 +254,7 @@ export const styles = StyleSheet.create({
     color: "#94A3B8",
     fontStyle: "italic",
     textAlign: "center",
+    marginTop: 4,
   },
 
   // Empty State Layout
