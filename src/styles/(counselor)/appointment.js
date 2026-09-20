@@ -50,7 +50,7 @@ export const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justify: "space-between",
     alignItems: "center",
     marginBottom: 8,
   },
@@ -67,7 +67,81 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     color: "#64748B",
     marginTop: 2,
+    marginBottom: 8,
+  },
+
+  // Styled Intake Details Section
+  expandToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginVertical: 6,
+  },
+  expandToggleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
+  },
+  intakeCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginTop: 8,
     marginBottom: 12,
+    gap: 10,
+  },
+  intakeSectionHeader: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#475569",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  intakeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  intakeLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  intakeValue: {
+    fontSize: 12,
+    color: "#475569",
+    flex: 1,
+  },
+  tagsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 4,
+  },
+  reasonTag: {
+    backgroundColor: "#E0F2FE",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  reasonTagText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#0369A1",
+  },
+  paymentBadge: {
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  paymentBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#15803D",
   },
 
   // Link & Call
@@ -139,6 +213,7 @@ export const styles = StyleSheet.create({
   historyClient: { fontSize: 15, fontWeight: "700", color: "#0F172A" },
   historyStatus: { fontSize: 12, fontWeight: "700", color: "#16A34A" },
   statusCancelled: { color: "#EF4444" },
+  statusTransferred: { color: "#0284C7" },
   historyMeta: { fontSize: 12, color: "#64748B", marginTop: 2 },
   historyNote: {
     fontSize: 12,

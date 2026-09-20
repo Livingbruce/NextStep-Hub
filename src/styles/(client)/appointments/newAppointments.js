@@ -90,7 +90,7 @@ export const styles = StyleSheet.create({
     marginBottom: 20,
   },
   optionsGrid: {
-    gap: 10,
+    gap: 12,
   },
   optionCard: {
     flexDirection: "row",
@@ -101,6 +101,60 @@ export const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     backgroundColor: "#F8FAFC",
     gap: 12,
+  },
+  // Expanded Counselor Card Layout
+  counselorCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+    gap: 12,
+  },
+  counselorInfoContainer: {
+    flex: 1,
+  },
+  counselorName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  counselorExp: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#936D9A",
+    marginTop: 2,
+  },
+  counselorSpec: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#475569",
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  counselorAbout: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  avatarWrapper: {
+    alignSelf: "flex-start",
+  },
+  counselorAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#E2E8F0",
+  },
+  avatarFallback: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
   },
   optionCardSelected: {
     borderColor: "#936D9A",

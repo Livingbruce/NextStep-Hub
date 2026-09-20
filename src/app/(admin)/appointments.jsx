@@ -1,155 +1,255 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   LayoutAnimation,
-  Platform,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
-  UIManager,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../../libs/supabase";
 import { styles } from "../../styles/(admin)/appointments";
 
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-// Sample Data with upcoming and past appointments
-const SAMPLE_APPOINTMENTS = [
-  {
-    id: "app-1",
-    clientName: "David Kimani",
-    counselorName: "Dr. Sarah Jenkins",
-    service: "Youth Career Mentorship",
-    dateTime: "2026-09-20T10:00:00",
-    status: "Upcoming",
-    location: "Virtual Room A",
-    counselorRemarks:
-      "Pre-session survey completed. Focus on career pathway choices.",
-    clientReview: null,
-  },
-  {
-    id: "app-2",
-    clientName: "Grace Wambui",
-    counselorName: "Dr. Aris Vance",
-    service: "Academic Stress Support",
-    dateTime: "2026-09-25T14:30:00",
-    status: "Upcoming",
-    location: "Consultation Room 102",
-    counselorRemarks:
-      "Client requested follow-up on examination coping techniques.",
-    clientReview: null,
-  },
-  {
-    id: "app-3",
-    clientName: "Brian Omondi",
-    counselorName: "Dr. Sarah Jenkins",
-    service: "Personal Growth Counseling",
-    dateTime: "2026-08-15T11:00:00",
-    status: "Completed",
-    location: "Virtual Room B",
-    counselorRemarks:
-      "Great progress made on personal goal setting. Client engaged well.",
-    clientReview: {
-      rating: 5,
-      comment: "Extremely helpful session! Very insightful advice.",
-    },
-  },
-  {
-    id: "app-4",
-    clientName: "Faith Chebet",
-    counselorName: "Dr. Aris Vance",
-    service: "Relationship Guidance",
-    dateTime: "2026-08-02T09:30:00",
-    status: "Completed",
-    location: "Consultation Room 101",
-    counselorRemarks:
-      "Addressed communication strategies. Next goals set for October.",
-    clientReview: {
-      rating: 4,
-      comment: "Good guidance overall. Looking forward to the next stage.",
-    },
-  },
-  {
-    id: "app-5",
-    clientName: "Kevin Mutua",
-    counselorName: "Dr. Sarah Jenkins",
-    service: "Youth Career Mentorship",
-    dateTime: "2025-11-12T15:00:00",
-    status: "Completed",
-    location: "Virtual Room A",
-    counselorRemarks: "Resume evaluation finalized. Career goals set.",
-    clientReview: {
-      rating: 5,
-      comment: "Transformed how I approach my job search!",
-    },
-  },
+const TERMINAL_STATUSES = [
+  "completed",
+  "cancelled_by_client",
+  "cancelled_by_counselor",
+  "no_show",
 ];
 
 export default function Appointments() {
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [expandedCardId, setExpandedCardId] = useState(null);
-  const [expandedMonths, setExpandedMonths] = useState({ "2026-August": true });
+  const [expandedMonths, setExpandedMonths] = useState({});
 
-  // 1. Separate & sort Upcoming Appointments (nearest to furthest)
-  const upcomingAppointments = useMemo(() => {
-    const now = new Date();
-    return SAMPLE_APPOINTMENTS.filter(
-      (app) => new Date(app.dateTime) >= now,
-    ).sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+  useEffect(() => {
+    fetchAdminAppointments();
   }, []);
 
-  // Group Past/Overdue Appointments by Year and Month
+  const fetchAdminAppointments = async () => {
+    try {
+      setLoading(true);
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        throw new Error("Admin session not found.");
+      }
+
+      // Fetch appointments with explicit relationship joins
+      const { data: appointmentsData, error: appointmentsError } =
+        await supabase
+          .from("appointments")
+          .select(
+            `
+            id,
+            counseling_type,
+            reasons,
+            other_reason,
+            session_goals,
+            notes,
+            session_link,
+            scheduled_start_time,
+            scheduled_end_time,
+            status,
+            client_id,
+            counselor_id,
+            client:profiles!appointments_client_id_fkey (
+              id,
+              first_name,
+              surname,
+              phone_no,
+              county
+            ),
+            counselor:profiles!appointments_counselor_id_fkey (
+              id,
+              first_name,
+              surname,
+              phone_no
+            )
+          `,
+          )
+          .order("scheduled_start_time", { ascending: false });
+
+      if (appointmentsError) {
+        console.error("Appointments error details:", appointmentsError);
+        throw appointmentsError;
+      }
+
+      // Fetch reviews
+      const { data: reviewsData, error: reviewsError } = await supabase
+        .from("appointment_reviews")
+        .select("id, appointment_id, rating, feedback_text, created_at")
+        .eq("reviewer_role", "client");
+
+      if (reviewsError) {
+        console.error("Reviews error details:", reviewsError);
+      }
+
+      const reviewsByAppointment = {};
+      (reviewsData || []).forEach((review) => {
+        reviewsByAppointment[review.appointment_id] = review;
+      });
+
+      const formattedAppointments = (appointmentsData || []).map((app) => {
+        const clientObj = Array.isArray(app.client)
+          ? app.client[0]
+          : app.client;
+        const counselorObj = Array.isArray(app.counselor)
+          ? app.counselor[0]
+          : app.counselor;
+
+        const clientName = clientObj
+          ? `${clientObj.first_name || ""} ${clientObj.surname || ""}`.trim()
+          : "Unassigned Client";
+
+        const counselorName = counselorObj
+          ? `${counselorObj.first_name || ""} ${counselorObj.surname || ""}`.trim()
+          : "Unassigned Counselor";
+
+        const counselorRemarks =
+          app.notes ||
+          app.session_goals ||
+          (Array.isArray(app.reasons) ? app.reasons.join(", ") : app.reasons) ||
+          app.other_reason ||
+          null;
+
+        const review = reviewsByAppointment[app.id];
+
+        return {
+          id: app.id,
+          rawStatus: app.status,
+          clientName: clientName || "Unnamed Client",
+          counselorName: counselorName || "Unassigned Counselor",
+          service: app.counseling_type || "General Session",
+          dateTime: app.scheduled_start_time,
+          status: app.status
+            ? app.status
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (char) => char.toUpperCase())
+            : "Scheduled",
+          location: app.session_link ? "Virtual Room" : "Pending Room",
+          counselorRemarks,
+          clientReview: review
+            ? {
+                rating: review.rating,
+                comment: review.feedback_text,
+              }
+            : null,
+        };
+      });
+
+      setAppointments(formattedAppointments);
+
+      const now = new Date();
+      const currentMonthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+
+      setExpandedMonths({
+        [currentMonthKey]: true,
+      });
+    } catch (error) {
+      console.error("Admin appointments catch error:", error);
+      Alert.alert(
+        "Fetch Failed",
+        error?.message || "Unable to load system appointments.",
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchAdminAppointments();
+  }, []);
+
+  // Filter upcoming active appointments
+  const upcomingAppointments = useMemo(() => {
+    const now = new Date();
+
+    return appointments
+      .filter((appointment) => {
+        if (!appointment.dateTime) return false;
+        const isFuture = new Date(appointment.dateTime) >= now;
+        const isTerminal = TERMINAL_STATUSES.includes(appointment.rawStatus);
+        return isFuture && !isTerminal;
+      })
+      .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+  }, [appointments]);
+
+  // Group completed, cancelled, no-show, and past appointments by Year -> Month -> Date
   const archiveGrouped = useMemo(() => {
     const now = new Date();
-    const pastApps = SAMPLE_APPOINTMENTS.filter(
-      (app) => new Date(app.dateTime) < now,
-    ).sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+
+    const pastOrTerminalAppointments = appointments
+      .filter((appointment) => {
+        if (!appointment.dateTime) return false;
+        const isPast = new Date(appointment.dateTime) < now;
+        const isTerminal = TERMINAL_STATUSES.includes(appointment.rawStatus);
+        return isPast || isTerminal;
+      })
+      .sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
 
     const archive = {};
 
-    pastApps.forEach((app) => {
-      const date = new Date(app.dateTime);
+    pastOrTerminalAppointments.forEach((appointment) => {
+      const date = new Date(appointment.dateTime);
       const year = date.getFullYear().toString();
-
-      // Fixed: lowercase "long"
-      const month = date.toLocaleString("en-US", { month: "long" });
+      const monthNumber = date.getMonth() + 1;
+      const monthName = date.toLocaleString("en-US", { month: "long" });
 
       if (!archive[year]) {
         archive[year] = {};
       }
-      if (!archive[year][month]) {
-        archive[year][month] = [];
+
+      if (!archive[year][monthNumber]) {
+        archive[year][monthNumber] = {
+          monthName,
+          appointments: [],
+        };
       }
-      archive[year][month].push(app);
+
+      archive[year][monthNumber].appointments.push(appointment);
     });
 
     return archive;
-  }, []);
+  }, [appointments]);
 
   const toggleCardExpand = (id) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedCardId((prev) => (prev === id ? null : id));
+    setExpandedCardId((previous) => (previous === id ? null : id));
   };
 
   const toggleMonthExpand = (key) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedMonths((prev) => ({ ...prev, [key]: !prev[key] }));
+    setExpandedMonths((previous) => ({
+      ...previous,
+      [key]: !previous[key],
+    }));
   };
 
   const renderAppointmentCard = (item, isUpcoming = false) => {
     const isExpanded = expandedCardId === item.id;
-    const formattedDate = new Date(item.dateTime).toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+
+    const formattedDate = item.dateTime
+      ? new Date(item.dateTime).toLocaleDateString("en-US", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "Unscheduled";
 
     return (
       <TouchableOpacity
@@ -161,12 +261,12 @@ export default function Appointments() {
         onPress={() => toggleCardExpand(item.id)}
         activeOpacity={0.85}
       >
-        {/* Card Header Summary */}
         <View style={styles.cardHeader}>
           <View style={styles.clientMeta}>
             <Text style={styles.clientName}>{item.clientName}</Text>
             <Text style={styles.serviceTag}>{item.service}</Text>
           </View>
+
           <View style={styles.cardRightMeta}>
             <View
               style={[
@@ -183,6 +283,7 @@ export default function Appointments() {
                 {item.status}
               </Text>
             </View>
+
             <Ionicons
               name={isExpanded ? "chevron-up" : "chevron-down"}
               size={18}
@@ -196,7 +297,6 @@ export default function Appointments() {
           <Text style={styles.cardDateText}>{formattedDate}</Text>
         </View>
 
-        {/* Expanded Detailed Section */}
         {isExpanded && (
           <View style={styles.expandedDetails}>
             <View style={styles.detailDivider} />
@@ -217,25 +317,26 @@ export default function Appointments() {
               </Text>
             </View>
 
-            {/* Counselor Remarks */}
             <View style={styles.remarkBox}>
-              <Text style={styles.boxTitle}>Counselor Remarks</Text>
+              <Text style={styles.boxTitle}>Counselor Remarks & Goals</Text>
               <Text style={styles.boxContent}>
-                {item.counselorRemarks || "No remarks filed yet."}
+                {item.counselorRemarks ||
+                  "No counselor comments or notes logged."}
               </Text>
             </View>
 
-            {/* Client Reviews */}
             <View style={styles.reviewBox}>
               <Text style={styles.boxTitle}>Client Review</Text>
               {item.clientReview ? (
                 <View>
                   <View style={styles.ratingRow}>
-                    {[...Array(5)].map((_, i) => (
+                    {Array.from({ length: 5 }).map((_, index) => (
                       <Ionicons
-                        key={i}
+                        key={index}
                         name={
-                          i < item.clientReview.rating ? "star" : "star-outline"
+                          index < (item.clientReview.rating || 0)
+                            ? "star"
+                            : "star-outline"
                         }
                         size={14}
                         color="#F59E0B"
@@ -243,7 +344,7 @@ export default function Appointments() {
                     ))}
                   </View>
                   <Text style={styles.boxContent}>
-                    "{item.clientReview.comment}"
+                    "{item.clientReview.comment || "No written review text."}"
                   </Text>
                 </View>
               ) : (
@@ -258,92 +359,123 @@ export default function Appointments() {
     );
   };
 
+  const sortedYears = Object.keys(archiveGrouped).sort(
+    (a, b) => Number(b) - Number(a),
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Appointments</Text>
           <Text style={styles.headerSubtitle}>
-            Manage upcoming schedules and archived sessions
+            Manage system-wide schedules, counselor logs, and client feedback
           </Text>
         </View>
 
-        {/* Section 1: Upcoming Appointments */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="calendar" size={20} color="#1E3A8A" />
-            <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-          </View>
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color="#1E3A8A"
+            style={{ marginTop: 40 }}
+          />
+        ) : (
+          <>
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Ionicons name="calendar" size={20} color="#1E3A8A" />
+                <Text style={styles.sectionTitle}>
+                  Upcoming Appointments ({upcomingAppointments.length})
+                </Text>
+              </View>
 
-          {upcomingAppointments.length > 0 ? (
-            upcomingAppointments.map((app) => renderAppointmentCard(app, true))
-          ) : (
-            <Text style={styles.emptyText}>
-              No upcoming appointments scheduled.
-            </Text>
-          )}
-        </View>
+              {upcomingAppointments.length > 0 ? (
+                upcomingAppointments.map((appointment) =>
+                  renderAppointmentCard(appointment, true),
+                )
+              ) : (
+                <Text style={styles.emptyText}>
+                  No upcoming appointments scheduled.
+                </Text>
+              )}
+            </View>
 
-        {/* Section 2: Strategic Archive (Year -> Month) */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="archive-outline" size={20} color="#1E3A8A" />
-            <Text style={styles.sectionTitle}>Strategic Archive</Text>
-          </View>
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Ionicons name="archive-outline" size={20} color="#1E3A8A" />
+                <Text style={styles.sectionTitle}>Strategic Archive</Text>
+              </View>
 
-          {Object.keys(archiveGrouped).length > 0 ? (
-            Object.keys(archiveGrouped).map((year) => (
-              <View key={year} style={styles.yearBlock}>
-                <Text style={styles.yearTitle}>{year}</Text>
-
-                {Object.keys(archiveGrouped[year]).map((month) => {
-                  const monthKey = `${year}-${month}`;
-                  const isMonthOpen = !!expandedMonths[monthKey];
-                  const monthApps = archiveGrouped[year][month];
+              {sortedYears.length > 0 ? (
+                sortedYears.map((year) => {
+                  const sortedMonths = Object.keys(archiveGrouped[year]).sort(
+                    (a, b) => Number(b) - Number(a),
+                  );
 
                   return (
-                    <View key={monthKey} style={styles.monthContainer}>
-                      <TouchableOpacity
-                        style={styles.monthHeader}
-                        onPress={() => toggleMonthExpand(monthKey)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.monthTitle}>{month}</Text>
-                        <View style={styles.monthBadge}>
-                          <Text style={styles.monthBadgeText}>
-                            {monthApps.length}{" "}
-                            {monthApps.length === 1 ? "Session" : "Sessions"}
-                          </Text>
-                          <Ionicons
-                            name={isMonthOpen ? "chevron-up" : "chevron-down"}
-                            size={16}
-                            color="#1E3A8A"
-                          />
-                        </View>
-                      </TouchableOpacity>
+                    <View key={year} style={styles.yearBlock}>
+                      <Text style={styles.yearTitle}>{year}</Text>
 
-                      {isMonthOpen && (
-                        <View style={styles.monthBody}>
-                          {monthApps.map((app) =>
-                            renderAppointmentCard(app, false),
-                          )}
-                        </View>
-                      )}
+                      {sortedMonths.map((monthNum) => {
+                        const monthKey = `${year}-${monthNum}`;
+                        const isMonthOpen = !!expandedMonths[monthKey];
+                        const { monthName, appointments: monthAppointments } =
+                          archiveGrouped[year][monthNum];
+
+                        return (
+                          <View key={monthKey} style={styles.monthContainer}>
+                            <TouchableOpacity
+                              style={styles.monthHeader}
+                              onPress={() => toggleMonthExpand(monthKey)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.monthTitle}>{monthName}</Text>
+
+                              <View style={styles.monthBadge}>
+                                <Text style={styles.monthBadgeText}>
+                                  {monthAppointments.length}{" "}
+                                  {monthAppointments.length === 1
+                                    ? "Session"
+                                    : "Sessions"}
+                                </Text>
+
+                                <Ionicons
+                                  name={
+                                    isMonthOpen ? "chevron-up" : "chevron-down"
+                                  }
+                                  size={16}
+                                  color="#1E3A8A"
+                                />
+                              </View>
+                            </TouchableOpacity>
+
+                            {isMonthOpen && (
+                              <View style={styles.monthBody}>
+                                {monthAppointments.map((appointment) =>
+                                  renderAppointmentCard(appointment, false),
+                                )}
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
                     </View>
                   );
-                })}
-              </View>
-            ))
-          ) : (
-            <Text style={styles.emptyText}>
-              No past appointments archived yet.
-            </Text>
-          )}
-        </View>
+                })
+              ) : (
+                <Text style={styles.emptyText}>
+                  No past appointments archived yet.
+                </Text>
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
