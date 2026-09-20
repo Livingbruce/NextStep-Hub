@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Keyboard,
   ScrollView,
@@ -11,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../../libs/supabase";
 import { styles } from "../../styles/(admin)/pricing";
 
 const PRESET_PRICES = [1500, 2000, 2500, 3000, 5000];
@@ -19,10 +21,40 @@ export default function Pricing() {
   const [price, setPrice] = useState("2500");
   const [currency, setCurrency] = useState("KES");
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [lastSavedPrice, setLastSavedPrice] = useState("2500");
 
+  // Fetch the active price on load
+  useEffect(() => {
+    fetchActivePricing();
+  }, []);
+
+  const fetchActivePricing = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "session_pricing")
+        .single();
+
+      if (error && error.code !== "PGRST116") {
+        console.error("Error fetching pricing:", error.message);
+      } else if (data?.value) {
+        const fetchedPrice = data.value.amount.toString();
+        const fetchedCurrency = data.value.currency || "KES";
+        setPrice(fetchedPrice);
+        setLastSavedPrice(fetchedPrice);
+        setCurrency(fetchedCurrency);
+      }
+    } catch (err) {
+      console.error("Failed to load setting:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handlePriceChange = (text) => {
-    // Keep only numeric values
     const numericValue = text.replace(/[^0-9]/g, "");
     setPrice(numericValue);
   };
@@ -31,7 +63,7 @@ export default function Pricing() {
     setPrice(value.toString());
   };
 
-  const handleSavePrice = () => {
+  const handleSavePrice = async () => {
     if (!price || parseFloat(price) <= 0) {
       Alert.alert("Invalid Price", "Please enter a valid appointment price.");
       return;
@@ -40,16 +72,50 @@ export default function Pricing() {
     Keyboard.dismiss();
     setIsSaving(true);
 
-    // Simulate saving to database/backend
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const { error } = await supabase.from("system_settings").upsert(
+        {
+          key: "session_pricing",
+          value: {
+            amount: Number(price),
+            currency: currency,
+          },
+          updated_at: new Date().toISOString(),
+          updated_by: user?.id || null,
+        },
+        { onConflict: "key" },
+      );
+
+      if (error) throw error;
+
       setLastSavedPrice(price);
       Alert.alert(
         "Pricing Updated",
         `Appointment base fee updated to ${currency} ${Number(price).toLocaleString()}.`,
       );
-    }, 600);
+    } catch (error) {
+      Alert.alert("Save Failed", error.message || "Unable to update price.");
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <ActivityIndicator size="large" color="#0F172A" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -133,14 +199,18 @@ export default function Pricing() {
                 disabled={isSaving}
                 activeOpacity={0.8}
               >
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={20}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.saveButtonText}>
-                  {isSaving ? "Updating Price..." : "Save Pricing Rate"}
-                </Text>
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="checkmark-circle-outline"
+                      size={20}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.saveButtonText}>Save Pricing Rate</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
