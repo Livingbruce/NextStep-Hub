@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { supabase } from "../../../libs/supabase";
+import { getFriendlyErrorMessage } from "../../components/errorHandler";
 import { styles } from "../../styles/(auth)/signup";
 
 const GENDER_OPTIONS = ["Male", "Female", "Prefer not to say"];
@@ -329,9 +330,9 @@ export default function SignupScreen() {
     return payload;
   };
 
-  // Submit complete registration flow
   const handleFinalSignup = async () => {
     setLoading(true);
+
     const cleanEmail = formData.email.trim().toLowerCase();
     const fullName = `${formData.firstName.trim()} ${
       formData.middleName.trim() ? formData.middleName.trim() + " " : ""
@@ -351,8 +352,8 @@ export default function SignupScreen() {
       });
 
       if (authError) {
-        Alert.alert("Registration Error", authError.message);
-        setLoading(false);
+        const friendlyMessage = getFriendlyErrorMessage(authError);
+        Alert.alert("Registration Failed", friendlyMessage);
         return;
       }
 
@@ -360,10 +361,9 @@ export default function SignupScreen() {
 
       if (!userId) {
         Alert.alert(
-          "Error",
-          "Could not retrieve authenticated user ID. Please try again.",
+          "Registration Issue",
+          "Could not verify user account creation. Please try logging in or contact support.",
         );
-        setLoading(false);
         return;
       }
 
@@ -375,18 +375,18 @@ export default function SignupScreen() {
         .insert([profilePayload]);
 
       if (profileError) {
-        Alert.alert("Profile Error", profileError.message);
-        setLoading(false);
+        const friendlyMessage = getFriendlyErrorMessage(profileError);
+        Alert.alert("Profile Creation Issue", friendlyMessage);
         return;
       }
 
       // 3. Route to corresponding portal after successful signup
       Alert.alert(
         "Registration Successful",
-        "Welcome to Nextstep! Registration scuccessful",
+        "Welcome to Nextstep! Your account has been created successfully.",
         [
           {
-            text: "Proceed",
+            text: "Proceed to Login",
             onPress: () => {
               router.replace("login");
             },
@@ -394,8 +394,9 @@ export default function SignupScreen() {
         ],
       );
     } catch (err) {
-      Alert.alert("Error", "An unexpected error occurred during signup.");
-      console.error(err);
+      console.error("Unexpected Signup Error:", err);
+      const friendlyMessage = getFriendlyErrorMessage(err);
+      Alert.alert("Error", friendlyMessage);
     } finally {
       setLoading(false);
     }
