@@ -1,16 +1,36 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Text, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { supabase } from "../../../libs/supabase";
 import { styles } from "../../styles/(auth)/statusScreen";
+import { useAuth } from "../_layout";
 
 export default function SuspendedScreen() {
   const router = useRouter();
+  const auth = useAuth();
+  const logout = auth?.logout;
+
+  const [loading, setLoading] = useState(false);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.replace("/login");
+    if (loading) return;
+    setLoading(true);
+
+    try {
+      await logout();
+
+      router.replace("/(auth)/landing");
+    } catch (error) {
+      Alert.alert("Sign Out Error", error?.message || "Failed to sign out.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,9 +55,19 @@ export default function SuspendedScreen() {
           <Text style={styles.contactEmail}>support@nextstep.org</Text>
         </View>
 
-        <TouchableOpacity style={styles.secondaryBtn} onPress={handleSignOut}>
-          <Ionicons name="log-out-outline" size={18} color="#64748B" />
-          <Text style={styles.secondaryBtnText}>Sign Out</Text>
+        <TouchableOpacity
+          style={[styles.secondaryBtn, loading && { opacity: 0.6 }]}
+          onPress={handleSignOut}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#64748B" />
+          ) : (
+            <>
+              <Ionicons name="log-out-outline" size={18} color="#64748B" />
+              <Text style={styles.secondaryBtnText}>Sign Out</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

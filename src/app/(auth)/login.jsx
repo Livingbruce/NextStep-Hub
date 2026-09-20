@@ -101,7 +101,7 @@ export default function LoginScreen() {
       // 2. Fetch user's profile and role
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("role, id, full_name")
+        .select("role, id, full_name, approved, suspended")
         .eq("id", authData.user.id)
         .single();
 

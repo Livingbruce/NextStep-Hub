@@ -44,9 +44,9 @@ export default function RootLayout() {
       try {
         const stored = await AsyncStorage.getItem(SESSION_KEY);
         if (isMounted && stored) {
-          const parsedUser = JSON.parse(stored);
-          setUser(parsedUser);
-          await fetchFreshStatus(parsedUser);
+          const fresh = await fetchFreshStatus(JSON.parse(stored));
+          setUser(fresh);
+          await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
         }
       } catch (err) {
         console.warn("Failed to restore session:", err);
@@ -75,15 +75,11 @@ export default function RootLayout() {
 
       if (error || !profile) return currentUser;
 
-      const updatedUser = {
+      return {
         ...currentUser,
-        approved: Boolean(profile.approved),
-        suspended: Boolean(profile.suspended),
+        approved: profile.approved,
+        suspended: profile.suspended,
       };
-
-      setUser(updatedUser);
-      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
-      return updatedUser;
     } catch (err) {
       console.warn("Error fetching profile status:", err);
       return currentUser;
@@ -95,32 +91,31 @@ export default function RootLayout() {
     if (!isPreloaderDone) return;
     if (!navigationState?.key) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
-    const currentAuthScreen = segments[1];
-
-    // Case A: No User logged in
     if (!user) {
-      if (!inAuthGroup) router.replace("/(auth)/landing");
+      if (segments[0] !== "(auth)") {
+        router.replace("/(auth)/landing");
+      }
       return;
     }
 
-    // Case B: User IS suspended (suspended === true)
-    if (user.suspended === true) {
+    const isApproved = Boolean(user.approved);
+    const isSuspended = Boolean(user.suspended);
+    const currentAuthScreen = segments[1];
+
+    if (isSuspended) {
       if (currentAuthScreen !== "suspendedScreen") {
         router.replace("/(auth)/suspendedScreen");
       }
       return;
     }
 
-    // Case C: User IS NOT approved (approved === false)
-    if (user.approved === false) {
+    if (!isApproved) {
       if (currentAuthScreen !== "pendingApproval") {
         router.replace("/(auth)/pendingApproval");
       }
       return;
     }
 
-    // Case D: User IS approved (approved === true) AND NOT suspended (suspended === false)
     const role = user?.role?.toLowerCase();
 
     if (role === "client" && segments[0] !== "(client)") {
@@ -133,15 +128,16 @@ export default function RootLayout() {
   }, [user, segments, isPreloaderDone, navigationState?.key]);
 
   const login = async (email, role, profile = null) => {
-    let sessionUser = {
+    let base = {
       id: profile?.id,
       email,
       role,
       profile,
-      approved: Boolean(profile?.approved),
-      suspended: Boolean(profile?.suspended),
+      approved: profile?.approved,
+      suspended: profile?.suspended,
     };
 
+    const sessionUser = await fetchFreshStatus(base);
     setUser(sessionUser);
 
     try {
@@ -164,9 +160,10 @@ export default function RootLayout() {
   };
 
   const checkStatus = async () => {
-    if (user) {
-      await fetchFreshStatus(user);
-    }
+    if (!user) return;
+    const fresh = await fetchFreshStatus(user);
+    setUser(fresh);
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
   };
 
   if (!isPreloaderDone) {

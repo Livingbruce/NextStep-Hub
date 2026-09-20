@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../../styles/(auth)/statusScreen";
@@ -7,14 +8,44 @@ import { useAuth } from "../_layout";
 
 export default function PendingApprovalScreen() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
   const { checkStatus, logout } = useAuth();
 
   const handleSignOut = async () => {
-    router.replace("landing");
+    try {
+      setLoading(true);
+      if (typeof logout === "function") {
+        await logout();
+      }
+      router.replace("/(auth)/landing");
+    } catch (error) {
+      Alert.alert("Sign Out Error", error?.message || "Failed to sign out.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRefresh = async () => {
-    await checkStatus();
+    try {
+      setLoading(true);
+      if (typeof checkStatus === "function") {
+        const updatedUser = await checkStatus();
+
+        // If user is now approved, trigger navigation manually or let layout guard handle it
+        if (updatedUser?.approved) {
+          Alert.alert("Approved!", "Your account has been approved.");
+        } else {
+          Alert.alert("Status", "Your account is still pending approval.");
+        }
+      }
+    } catch (error) {
+      Alert.alert(
+        "Refresh Error",
+        error?.message || "Could not check approval status.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
