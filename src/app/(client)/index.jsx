@@ -12,8 +12,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { checkAppointmentReminders } from "../../../libs/appointmentsReminder";
 import { supabase } from "../../../libs/supabase";
 import { CATEGORIES } from "../../components/client/Dashboard";
+import NotificationBell from "../../components/NotificationBell";
 import { styles } from "../../styles/(client)/Dashboard";
 import { useAuth } from "../_layout";
 
@@ -33,6 +35,12 @@ export default function ClientDashboard() {
         fetchDashboardData();
       }
     }, [user?.id]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      checkAppointmentReminders();
+    }, []),
   );
 
   const fetchDashboardData = async () => {
@@ -193,13 +201,11 @@ export default function ClientDashboard() {
                 </View>
 
                 <View style={styles.headerActions}>
-                  <TouchableOpacity
-                    style={styles.headerIconButton}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="notifications" size={18} color="#FFFFFF" />
-                    <View style={styles.notificationDot} />
-                  </TouchableOpacity>
+                  <NotificationBell
+                    userId={user?.id}
+                    color="#FFFFFF"
+                    route="/notifications"
+                  />
 
                   <TouchableOpacity
                     style={styles.logoutButton}

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,7 +12,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { checkAppointmentReminders } from "../../../libs/appointmentsReminder";
 import { supabase } from "../../../libs/supabase";
+import NotificationBell from "../../components/NotificationBell";
 import { styles } from "../../styles/(counselor)/home";
 import { useAuth } from "../_layout";
 
@@ -28,6 +31,12 @@ export default function CounselorDashboard() {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkAppointmentReminders();
+    }, []),
+  );
 
   const fetchDashboardData = async () => {
     try {
@@ -189,13 +198,11 @@ export default function CounselorDashboard() {
         </View>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.actionIconBtn}
-            onPress={() => Alert.alert("Notifications", "No new alerts.")}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="notifications-outline" size={20} color="#0F172A" />
-          </TouchableOpacity>
+          <NotificationBell
+            userId={user?.id}
+            color="#0F172A"
+            route="/notifications"
+          />
 
           <TouchableOpacity
             style={[styles.actionIconBtn, styles.logoutBtn]}

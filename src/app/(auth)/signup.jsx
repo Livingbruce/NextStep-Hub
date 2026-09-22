@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { NOTIFICATION_TYPES, notifyAdmins } from "../../../libs/notifications";
 import { supabase } from "../../../libs/supabase";
 import { getFriendlyErrorMessage } from "../../components/errorHandler";
 import { styles } from "../../styles/(auth)/signup";
@@ -378,6 +379,16 @@ export default function SignupScreen() {
         const friendlyMessage = getFriendlyErrorMessage(profileError);
         Alert.alert("Profile Creation Issue", friendlyMessage);
         return;
+      }
+
+      // Alerts admin on new staff account for approval
+      if (selectedRole !== "Client") {
+        await notifyAdmins({
+          type: NOTIFICATION_TYPES.COUNSELOR_SIGNUP,
+          title: `New ${selectedRole} Signup`,
+          body: `${fullName} signed up as ${selectedRole} and needs approval.`,
+          data: { userId },
+        });
       }
 
       // 3. Route to corresponding portal after successful signup
