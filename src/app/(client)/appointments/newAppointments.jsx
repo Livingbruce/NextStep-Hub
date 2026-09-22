@@ -16,6 +16,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  createNotification,
+  NOTIFICATION_TYPES,
+  notifyAdmins,
+} from "../../../../libs/notifications";
 import { supabase } from "../../../../libs/supabase";
 import { styles } from "../../../styles/(client)/appointments/newAppointments";
 
@@ -377,6 +382,19 @@ export default function NewAppointmentScreen() {
       const { error } = await supabase.from("appointments").insert([payload]);
 
       if (error) throw error;
+
+      await createNotification({
+        recipientId: selectedCounselorId,
+        type: NOTIFICATION_TYPES.NEW_APPOINTMENT,
+        title: "New Appointment Booked",
+        body: `A new ${counselingType} session has been booked with you.`,
+      });
+
+      await notifyAdmins({
+        type: NOTIFICATION_TYPES.NEW_APPOINTMENT_ADMIN,
+        title: "New Appointment Created",
+        body: `A new ${counselingType} session was booked.`,
+      });
 
       await AsyncStorage.removeItem(STORAGE_KEY);
       setStep(11);

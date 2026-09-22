@@ -14,6 +14,10 @@ import {
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  createNotification,
+  NOTIFICATION_TYPES,
+} from "../../../libs/notifications";
 import { supabase } from "../../../libs/supabase";
 import { styles } from "../../styles/(counselor)/appointment";
 
@@ -265,6 +269,17 @@ export default function AppointmentsScreen() {
         .eq("id", id);
 
       if (error) throw error;
+
+      const session = appointments.find((a) => a.id === id);
+      if (session?.client?.id) {
+        await createNotification({
+          recipientId: session.client.id,
+          type: NOTIFICATION_TYPES.LINK_UPDATED,
+          title: "Meeting Link Updated",
+          body: "Your counselor added/updated the virtual meeting link for your session.",
+          data: { appointmentId: id },
+        });
+      }
 
       // 1. Optimistically update local appointments state
       setAppointments((prevAppointments) =>

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../libs/supabase";
+import NotificationBell from "../../components/NotificationBell";
 import { styles } from "../../styles/(admin)/home";
 import { useAuth } from "../_layout";
 
@@ -60,13 +61,26 @@ export default function AdminHome() {
   const [loadingActions, setLoadingActions] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [adminName, setAdminName] = useState("Administrator");
+  const [user, setUser] = useState(null);
 
-  // Dynamic time-based greeting calculation
+  // time-based greeting calculation
   const greeting = useMemo(() => {
     const hours = new Date().getHours();
     if (hours < 12) return "Good Morning";
     if (hours < 18) return "Good Afternoon";
     return "Good Evening";
+  }, []);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      setUser(user);
+    };
+
+    getUser();
   }, []);
 
   useEffect(() => {
@@ -368,17 +382,11 @@ export default function AdminHome() {
             <Text style={styles.adminTitle}>{adminName}</Text>
           </View>
           <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => router.push("/(admin)/notifications")}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color="#0F172A"
-              />
-              <View style={styles.notificationDot} />
-            </TouchableOpacity>
+            <NotificationBell
+              userId={user?.id}
+              color="#0F172A"
+              route="/notifications"
+            />
             <TouchableOpacity style={styles.logoutButton} onPress={logout}>
               <Ionicons name="log-out-outline" size={22} color="#EF4444" />
             </TouchableOpacity>

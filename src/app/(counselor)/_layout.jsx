@@ -58,6 +58,10 @@ export default function CounselorLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="notifications"
+        options={{ href: null, tabBarStyle: { display: "none" } }}
+      />
     </Tabs>
   );
 }

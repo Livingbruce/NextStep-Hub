@@ -467,6 +467,15 @@ export default function Programs() {
         await supabase.storage.from("posters").remove([oldPosterPath]);
       }
 
+      if (!editingProgram) {
+        await notifyAdmins({
+          type: NOTIFICATION_TYPES.NEW_PROGRAM,
+          title: "New Program Created",
+          body: `"${formTitle.trim()}" was added by a counselor.`,
+          data: { programId },
+        });
+      }
+
       setIsProgramModalOpen(false);
       await fetchPrograms();
     } catch (err) {
