@@ -1,247 +1,307 @@
-import { Dimensions, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 
-const { height } = Dimensions.get("window");
+export const ACCENT = "#F05A2B";
+export const INK = "#0F172A";
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 50,
-    paddingBottom: 32,
-  },
-  header: {
-    marginBottom: 24,
+  root: { flex: 1, backgroundColor: ACCENT },
+
+  /* ---------- Header ---------- */
+  header: { overflow: "hidden" },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "rgba(255,255,255,0.92)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    shadowColor: INK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#0F172A",
+  backSpacer: { width: 40, height: 40 },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: INK,
+    letterSpacing: -0.4,
   },
-  subtitle: {
-    fontSize: 14,
-    color: "#64748B",
-    marginTop: 4,
-  },
-  progressContainer: {
-    marginBottom: 24,
-  },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  stepPill: {
+    minWidth: 40,
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: "rgba(15,23,42,0.16)",
     alignItems: "center",
-    marginBottom: 8,
+    justifyContent: "center",
   },
-  progressStepText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#E3562A",
+  stepPillText: { fontSize: 12, fontWeight: "800", color: INK },
+
+  /* ---------- Step indicator ---------- */
+  stepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 30,
+    marginTop: 16,
   },
-  progressTitleText: {
-    fontSize: 12,
-    color: "#64748B",
+  stepNodeWrap: {
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  progressBarBg: {
-    height: 6,
-    backgroundColor: "#E2E8F0",
-    borderRadius: 3,
+  stepNode: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepNodeText: { fontSize: 13, fontWeight: "900" },
+  stepLabel: {
+    position: "absolute",
+    top: 36,
+    left: -30,
+    width: 90,
+    textAlign: "center",
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(15,23,42,0.6)",
+  },
+  stepLabelActive: { color: INK, fontWeight: "900" },
+  stepLine: {
+    flex: 1,
+    height: 3,
+    marginHorizontal: 8,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.3)",
     overflow: "hidden",
   },
-  progressBarFill: {
-    height: "100%",
-    backgroundColor: "#E3562A",
-    borderRadius: 3,
+  stepLineFill: { height: "100%", backgroundColor: "#FFFFFF" },
+
+  /* ---------- Sheet ---------- */
+  sheet: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    overflow: "hidden",
   },
-  formGroup: {
-    gap: 16,
+  sheetContent: { flexGrow: 1, alignItems: "center", paddingTop: 26 },
+  column: { width: "100%", maxWidth: 480 },
+
+  stepTitle: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: INK,
+    letterSpacing: -0.5,
   },
-  inputContainer: {
-    marginBottom: 12,
-  },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  labelRowBetween: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  label: {
+  stepSubtitle: {
+    marginTop: 4,
     fontSize: 14,
-    fontWeight: "600",
-    color: "#334155",
-  },
-  requiredStar: {
-    color: "#DC2626",
-    marginLeft: 4,
-  },
-  sectionHeader: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
-    marginBottom: 4,
+    color: "#64748B",
+    lineHeight: 20,
   },
 
-  /* --- ROLE SELECTION STYLES --- */
-  roleSelectionGrid: {
+  rolePill: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-    marginTop: 4,
-  },
-  roleCard: {
-    flex: 1,
-    flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
+    alignSelf: "flex-start",
+    gap: 6,
+    marginTop: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: "#FFF3EE",
+    borderWidth: 1,
+    borderColor: "#FFD9CB",
   },
-  selectedRoleCard: {
-    borderColor: "#E3562A",
-    backgroundColor: "#FFF5F2",
-  },
-  roleCardText: {
+  rolePillText: { fontSize: 12, fontWeight: "800", color: "#9A3412" },
+
+  form: { gap: 16, marginTop: 20 },
+
+  /* ---------- Fields ---------- */
+  fieldError: {
+    marginTop: 6,
+    marginLeft: 4,
     fontSize: 12,
     fontWeight: "600",
-    color: "#64748B",
-    marginTop: 6,
-    textAlign: "center",
+    color: "#DC2626",
   },
-  selectedRoleCardText: {
-    color: "#E3562A",
-    fontWeight: "700",
-  },
+  eye: { padding: 4 },
+  matchIcon: { marginRight: 6 },
 
-  /* --- INPUT STYLES --- */
-  inputWrapper: {
+  groupLabelRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 48,
-    backgroundColor: "#FFFFFF",
+    justifyContent: "space-between",
+    marginBottom: 10,
   },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    fontSize: 14,
-    color: "#0F172A",
-  },
+  groupLabel: { fontSize: 14, fontWeight: "800", color: "#334155" },
+  requiredStar: { color: "#DC2626", fontWeight: "800" },
 
-  /* --- SPECIALIZATIONS (Counselor, Step 2) --- */
-  addSpecButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  addSpecText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#E3562A",
-  },
-  specInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  },
-  removeSpecButton: {
-    width: 40,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    backgroundColor: "#FEF2F2",
-  },
-
-  /* --- CHIP / OPTIONS SELECTION (Gender, Relationship, Religion) --- */
-  optionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 4,
-  },
+  /* ---------- Chips ---------- */
+  chipsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
   },
-  selectedChip: {
-    borderColor: "#E3562A",
-    backgroundColor: "#FFF5F2",
+  chipText: { fontSize: 13, fontWeight: "600", color: "#64748B" },
+  chipTextSelected: { color: ACCENT, fontWeight: "800" },
+
+  /* ---------- Password strength ---------- */
+  strengthWrap: { marginTop: 10, marginHorizontal: 2 },
+  strengthRow: { flexDirection: "row", gap: 6 },
+  strengthSegment: {
+    flex: 1,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#E2E8F0",
+    overflow: "hidden",
   },
-  chipText: {
+  strengthFill: { flex: 1, borderRadius: 3 },
+  strengthLabel: { marginTop: 6, fontSize: 12, fontWeight: "700" },
+
+  /* ---------- Specializations ---------- */
+  specRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  specRemove: {
+    width: 44,
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: "#FEF2F2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addSpecButton: { flexDirection: "row", alignItems: "center", gap: 4 },
+  addSpecText: { fontSize: 13, fontWeight: "800", color: ACCENT },
+
+  /* ---------- Messages ---------- */
+  errorBanner: {
+    flexDirection: "row",
+    gap: 10,
+    padding: 14,
+    marginTop: 16,
+    borderRadius: 14,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  errorText: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "#64748B",
+    lineHeight: 19,
+    color: "#991B1B",
+    fontWeight: "500",
   },
-  selectedChipText: {
-    color: "#E3562A",
-    fontWeight: "700",
+  errorAction: {
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#DC2626",
   },
 
-  /* --- BUTTON STYLES --- */
-  buttonContainer: {
+  noteRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  noteText: { flex: 1, fontSize: 12, lineHeight: 18, color: "#64748B" },
+
+  linkRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+    paddingTop: 4,
+  },
+  linkText: { fontSize: 14, color: "#64748B" },
+  linkAccent: { fontSize: 14, fontWeight: "800", color: ACCENT },
+
+  /* ---------- Sticky footer ---------- */
+  footer: {
+    alignItems: "center",
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+    backgroundColor: "#FFFFFF",
+  },
+  footerInner: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 24,
-  },
-  nextButton: {
-    flex: 1,
-    height: 50,
-    backgroundColor: "#E3562A",
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  fullWidthButton: {
     width: "100%",
+    maxWidth: 480,
   },
-  nextButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
+  footerBack: { flex: 0.8 },
+  footerNext: { flex: 1.4 },
+
+  /* ---------- Success ---------- */
+  successWrap: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 24,
+    gap: 14,
   },
-  backStepButton: {
-    flex: 1,
-    height: 50,
-    backgroundColor: "#F1F5F9",
-    borderRadius: 12,
+  successBadgeBox: {
+    width: 110,
+    height: 110,
     alignItems: "center",
     justifyContent: "center",
   },
-  backStepText: {
-    color: "#475569",
-    fontSize: 16,
-    fontWeight: "600",
+  successBadge: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#16A34A",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
   },
+  successTitle: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: INK,
+    textAlign: "center",
+    letterSpacing: -0.5,
+  },
+  successBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: "#64748B",
+    textAlign: "center",
+    paddingHorizontal: 8,
+  },
+  successNotice: {
+    flexDirection: "row",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  successNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#92400E",
+  },
+  confettiPiece: { position: "absolute" },
 });
