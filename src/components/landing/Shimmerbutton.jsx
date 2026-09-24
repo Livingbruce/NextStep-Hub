@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import Animated, {
   Easing,
   interpolate,
@@ -17,6 +17,8 @@ export default function ShimmerButton({
   label,
   onPress,
   variant = "primary",
+  loading = false,
+  disabled = false,
   style,
 }) {
   const isPrimary = variant === "primary";
@@ -51,10 +53,19 @@ export default function ShimmerButton({
   }));
 
   return (
-    <Animated.View style={[styles.shadow(isPrimary), containerStyle, style]}>
+    <Animated.View
+      style={[
+        styles.shadow(isPrimary),
+        containerStyle,
+        (disabled || loading) && { opacity: 0.85 },
+        style,
+      ]}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
+        accessibilityState={{ disabled: disabled || loading, busy: loading }}
+        disabled={disabled || loading}
         onPressIn={() =>
           press.set(withSpring(0.96, { damping: 15, stiffness: 300 }))
         }
@@ -97,9 +108,13 @@ export default function ShimmerButton({
           </Animated.View>
         )}
 
-        <Text style={[styles.label, !isPrimary && styles.secondaryLabel]}>
-          {label}
-        </Text>
+        {loading ? (
+          <ActivityIndicator color={isPrimary ? "#FFFFFF" : "#0F172A"} />
+        ) : (
+          <Text style={[styles.label, !isPrimary && styles.secondaryLabel]}>
+            {label}
+          </Text>
+        )}
       </Pressable>
     </Animated.View>
   );
