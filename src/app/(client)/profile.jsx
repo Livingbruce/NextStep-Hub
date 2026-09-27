@@ -13,9 +13,22 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  Layout,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../libs/supabase";
 import { styles } from "../../styles/(client)/Profile";
+
+// Animated components
+const AnimatedTouchableOpacity =
+  Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -24,6 +37,13 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [imageError, setImageError] = useState(false);
+
+  // Micro-interaction scale shared value
+  const avatarScale = useSharedValue(1);
+
+  const avatarAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: avatarScale.value }],
+  }));
 
   const [profile, setProfile] = useState({
     id: null,
@@ -73,7 +93,6 @@ export default function ProfileScreen() {
         return;
       }
 
-      // Client profile
       if (dbProfile.role?.toLowerCase() !== "client") {
         Alert.alert(
           "Unauthorized",
@@ -160,7 +179,6 @@ export default function ProfileScreen() {
       await uploadProfileImage(asset);
     } catch (error) {
       console.error("Image picker error:", error);
-
       Alert.alert("Error", error?.message || "Could not select the image.");
     }
   };
@@ -192,17 +210,12 @@ export default function ProfileScreen() {
         fileExt = "jpeg";
       }
 
-      // Only allow normal image formats.
       if (!["jpeg", "png", "webp"].includes(fileExt)) {
         fileExt = "jpeg";
       }
 
       const contentType = `image/${fileExt}`;
-
-      // Same concept as Admin/Counselor:
-      // user.id is the folder owner.
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
       const fileData = decode(asset.base64);
 
       if (!fileData) {
@@ -248,11 +261,9 @@ export default function ProfileScreen() {
       }));
 
       setImageError(false);
-
       Alert.alert("Success", "Profile picture updated successfully!");
     } catch (error) {
       console.error("Avatar upload error:", error);
-
       Alert.alert(
         "Upload Failed",
         error?.message || "Could not upload profile picture.",
@@ -331,11 +342,9 @@ export default function ProfileScreen() {
       }));
 
       setIsEditing(false);
-
       Alert.alert("Success", "Profile updated successfully!");
     } catch (error) {
       console.error("Save profile error:", error);
-
       Alert.alert("Save Failed", error?.message || "Failed to update profile.");
     } finally {
       setSaving(false);
@@ -343,7 +352,6 @@ export default function ProfileScreen() {
   };
 
   const handleCancelEdit = () => {
-    // Reload from database so cancelled edits disappear.
     fetchProfile();
     setIsEditing(false);
   };
@@ -362,21 +370,31 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Header with Layout Animations */}
+        <Animated.View
+          style={styles.header}
+          entering={FadeInDown.duration(400)}
+          layout={Layout.springify()}
+        >
           <Text style={styles.headerTitle}>My Profile</Text>
 
           {!isEditing ? (
-            <TouchableOpacity
+            <AnimatedTouchableOpacity
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(200)}
               style={styles.editHeaderBtn}
               onPress={() => setIsEditing(true)}
               disabled={saving}
             >
               <Ionicons name="create-outline" size={18} color="#16A34A" />
               <Text style={styles.editHeaderBtnText}>Edit</Text>
-            </TouchableOpacity>
+            </AnimatedTouchableOpacity>
           ) : (
-            <View style={{ flexDirection: "row", gap: 10 }}>
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(200)}
+              style={{ flexDirection: "row", gap: 10 }}
+            >
               <TouchableOpacity
                 style={styles.cancelHeaderBtn}
                 onPress={handleCancelEdit}
@@ -403,13 +421,17 @@ export default function ProfileScreen() {
                   </>
                 )}
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           )}
-        </View>
+        </Animated.View>
 
-        {/* Profile Avatar */}
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatarWrapper}>
+        {/* Profile Avatar Card */}
+        <Animated.View
+          style={styles.avatarContainer}
+          entering={FadeInDown.delay(100).duration(500)}
+          layout={Layout.springify()}
+        >
+          <Animated.View style={[styles.avatarWrapper, avatarAnimatedStyle]}>
             {profile.profileImageUri && !imageError ? (
               <Image
                 source={{
@@ -428,26 +450,30 @@ export default function ProfileScreen() {
 
             <TouchableOpacity
               style={styles.addPhotoButton}
+              onPressIn={() => (avatarScale.value = withSpring(0.9))}
+              onPressOut={() => (avatarScale.value = withSpring(1))}
               onPress={handlePickImage}
               activeOpacity={0.8}
               disabled={saving}
             >
               <Ionicons name="camera" size={16} color="#FFFFFF" />
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
           {isEditing ? (
-            <View style={{ width: "100%" }}>
+            <Animated.View
+              entering={FadeIn.duration(250)}
+              exiting={FadeOut.duration(200)}
+              style={{ width: "100%" }}
+            >
               <TextInput
                 style={styles.inputName}
                 value={profile.fullName}
                 onChangeText={(text) => {
                   const parts = text.trim().split(/\s+/);
-
                   const firstName = parts[0] || "";
                   const surname =
                     parts.length > 1 ? parts[parts.length - 1] : "";
-
                   const middleName =
                     parts.length > 2 ? parts.slice(1, -1).join(" ") : "";
 
@@ -462,23 +488,30 @@ export default function ProfileScreen() {
                 placeholder="Full Name"
                 placeholderTextColor="#94A3B8"
               />
-            </View>
+            </Animated.View>
           ) : (
-            <Text style={styles.userName}>{profile.fullName || "Client"}</Text>
+            <Animated.Text
+              entering={FadeIn.duration(250)}
+              style={styles.userName}
+            >
+              {profile.fullName || "Client"}
+            </Animated.Text>
           )}
 
           <Text style={styles.userRole}>Youth Client</Text>
-        </View>
+        </Animated.View>
 
-        {/* Account Details */}
-        <View style={styles.sectionCard}>
+        {/* Section 1: Account Details */}
+        <Animated.View
+          style={styles.sectionCard}
+          entering={FadeInDown.delay(200).duration(500)}
+          layout={Layout.springify()}
+        >
           <Text style={styles.sectionTitle}>Account Details</Text>
 
-          {/* Email */}
           <View style={styles.fieldRow}>
             <View style={styles.fieldInfo}>
               <Text style={styles.fieldLabel}>Email Address</Text>
-
               <Text style={styles.fieldValue}>
                 {profile.email || "Not provided"}
               </Text>
@@ -487,11 +520,9 @@ export default function ProfileScreen() {
 
           <View style={styles.divider} />
 
-          {/* Phone */}
           <View style={styles.fieldRow}>
             <View style={styles.fieldInfo}>
               <Text style={styles.fieldLabel}>Phone Number</Text>
-
               {isEditing ? (
                 <TextInput
                   style={styles.inputField}
@@ -511,17 +542,19 @@ export default function ProfileScreen() {
               )}
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* Personal Details */}
-        <View style={styles.sectionCard}>
+        {/* Section 2: Personal Details */}
+        <Animated.View
+          style={styles.sectionCard}
+          entering={FadeInDown.delay(300).duration(500)}
+          layout={Layout.springify()}
+        >
           <Text style={styles.sectionTitle}>Personal Details</Text>
 
-          {/* Gender */}
           <View style={styles.gridRow}>
             <View style={styles.gridItem}>
               <Text style={styles.fieldLabel}>Gender</Text>
-
               {isEditing ? (
                 <TextInput
                   style={styles.inputField}
@@ -540,10 +573,8 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {/* Age */}
             <View style={styles.gridItem}>
               <Text style={styles.fieldLabel}>Age</Text>
-
               {isEditing ? (
                 <TextInput
                   style={styles.inputField}
@@ -566,11 +597,9 @@ export default function ProfileScreen() {
 
           <View style={styles.divider} />
 
-          {/* County */}
           <View style={styles.gridRow}>
             <View style={styles.gridItem}>
               <Text style={styles.fieldLabel}>County</Text>
-
               {isEditing ? (
                 <TextInput
                   style={styles.inputField}
@@ -589,10 +618,8 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {/* Relationship */}
             <View style={styles.gridItem}>
               <Text style={styles.fieldLabel}>Relationship Status</Text>
-
               {isEditing ? (
                 <TextInput
                   style={styles.inputField}
@@ -614,11 +641,9 @@ export default function ProfileScreen() {
 
           <View style={styles.divider} />
 
-          {/* Religion */}
           <View style={styles.gridRow}>
             <View style={styles.gridItem}>
               <Text style={styles.fieldLabel}>Religion</Text>
-
               {isEditing ? (
                 <TextInput
                   style={styles.inputField}
@@ -637,16 +662,19 @@ export default function ProfileScreen() {
               )}
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* Emergency Contact */}
-        <View style={styles.sectionCard}>
+        {/* Section 3: Emergency Contact */}
+        <Animated.View
+          style={styles.sectionCard}
+          entering={FadeInDown.delay(400).duration(500)}
+          layout={Layout.springify()}
+        >
           <Text style={styles.sectionTitle}>Emergency Contact</Text>
 
           <View style={styles.gridRow}>
             <View style={styles.gridItem}>
               <Text style={styles.fieldLabel}>Contact Phone</Text>
-
               {isEditing ? (
                 <TextInput
                   style={styles.inputField}
@@ -668,7 +696,6 @@ export default function ProfileScreen() {
 
             <View style={styles.gridItem}>
               <Text style={styles.fieldLabel}>Relationship</Text>
-
               {isEditing ? (
                 <TextInput
                   style={styles.inputField}
@@ -687,22 +714,28 @@ export default function ProfileScreen() {
               )}
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* Save Button */}
+        {/* Animated Save Button */}
         {isEditing && (
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={handleSaveProfile}
-            disabled={saving}
-            activeOpacity={0.8}
+          <Animated.View
+            entering={FadeInDown.duration(300)}
+            exiting={FadeOut.duration(200)}
+            layout={Layout.springify()}
           >
-            {saving ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSaveProfile}
+              disabled={saving}
+              activeOpacity={0.8}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
         )}
       </ScrollView>
     </SafeAreaView>

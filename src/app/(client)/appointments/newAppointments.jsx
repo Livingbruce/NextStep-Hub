@@ -143,6 +143,31 @@ export default function NewAppointmentScreen() {
     }
   };
 
+  // Checks if the counselor has any conflicting appointment in the target window
+  const checkCounselorConflict = async (counselorId, startTime, endTime) => {
+    try {
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("id")
+        .eq("counselor_id", counselorId)
+        .not(
+          "status",
+          "in",
+          '("cancelled_by_client","cancelled_by_counselor","no_show")',
+        )
+        .lt("scheduled_start_time", endTime.toISOString())
+        .gt("scheduled_end_time", startTime.toISOString());
+
+      if (error) throw error;
+
+      // Return true if conflicts exist
+      return data && data.length > 0;
+    } catch (err) {
+      console.error("Error checking counselor schedule availability:", err);
+      return false;
+    }
+  };
+
   const loadDraft = async () => {
     try {
       const savedDraft = await AsyncStorage.getItem(STORAGE_KEY);
@@ -409,7 +434,7 @@ export default function NewAppointmentScreen() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1 && !counselingType)
       return Alert.alert("Required", "Please select a counseling type.");
     if (step === 2 && selectedReasons.length === 0)
@@ -447,6 +472,25 @@ export default function NewAppointmentScreen() {
       }
       if (!validateWorkingHours(selectedDate)) {
         return;
+      }
+
+      // --- OVERLAP & CONFLICT CHECK STARTS HERE ---
+      setLoading(true);
+      const startTime = new Date(selectedDate);
+      const endTime = new Date(startTime.getTime() + 50 * 60000);
+
+      const hasConflict = await checkCounselorConflict(
+        selectedCounselorId,
+        startTime,
+        endTime,
+      );
+      setLoading(false);
+
+      if (hasConflict) {
+        return Alert.alert(
+          "Time Unavailable",
+          "This counselor already has an appointment scheduled at this time. Please pick another time.",
+        );
       }
     }
     if (step === 10) {
