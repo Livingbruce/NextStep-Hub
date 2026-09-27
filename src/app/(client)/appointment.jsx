@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -43,9 +43,11 @@ export default function AppointmentScreen() {
   const [cancelReason, setCancelReason] = useState("");
   const [reviewText, setReviewText] = useState("");
 
-  useEffect(() => {
-    fetchAppointments();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchAppointments();
+    }, []),
+  );
 
   const fetchAppointments = async () => {
     try {

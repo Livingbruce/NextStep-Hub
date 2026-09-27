@@ -50,18 +50,38 @@ export const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: "row",
-    justify: "space-between",
-    alignItems: "center",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 8,
+    gap: 8,
   },
   badge: {
     backgroundColor: "#EFF6FF",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
+    alignSelf: "flex-start",
   },
   badgeText: { fontSize: 12, color: "#1E3A8A", fontWeight: "600" },
-  timeText: { fontSize: 12, color: "#64748B" },
+
+  timeContainer: {
+    alignItems: "flex-end",
+    flexShrink: 1,
+  },
+  pastDueBadge: {
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginBottom: 2,
+  },
+  pastDueText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#B45309",
+  },
+  timeText: { fontSize: 12, color: "#64748B", textAlign: "right" },
+  timeTextPast: { color: "#D97706", fontWeight: "700" },
   clientName: { fontSize: 17, fontWeight: "700", color: "#0F172A" },
   clientMeta: {
     fontSize: 13,

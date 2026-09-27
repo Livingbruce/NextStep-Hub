@@ -1,27 +1,189 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  ImageBackground,
   Linking,
+  Pressable,
   ScrollView,
+  StyleSheet,
   Text,
-  TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  FadeInDown,
+  FadeInRight,
+  FadeOutUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+
 import { checkAppointmentReminders } from "../../../libs/appointmentsReminder";
 import { supabase } from "../../../libs/supabase";
 import { CATEGORIES } from "../../components/client/Dashboard";
+import AuroraBlobs from "../../components/landing/AuroraBlobs";
+import ShimmerButton from "../../components/landing/Shimmerbutton";
 import NotificationBell from "../../components/NotificationBell";
 import { styles } from "../../styles/(client)/Dashboard";
 import { useAuth } from "../_layout";
 
+// 1. Rotating Text Component
+function RotatingText({ phrases, interval = 2800 }) {
+  const [index, setIndex] = useState(0);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % phrases.length);
+    }, interval);
+    return () => clearInterval(timer);
+  }, [phrases.length, interval]);
+
+  return (
+    <View style={{ height: 28, overflow: "hidden" }}>
+      <Animated.Text
+        key={phrases[index]}
+        entering={FadeInDown.duration(400)}
+        exiting={FadeOutUp.duration(300)}
+        style={styles.heroHighlightText}
+      >
+        {phrases[index]}
+      </Animated.Text>
+    </View>
+  );
+}
+
+// 2. Interactive Mood Check-In Widget (Spacious 2x2 Bento Grid Layout)
+const MOODS = [
+  { id: "seeking", emoji: "🌱", label: "Growing", desc: "Open to guidance" },
+  { id: "hopeful", emoji: "✨", label: "Hopeful", desc: "Feeling positive" },
+  { id: "anxious", emoji: "🌧️", label: "Overwhelmed", desc: "Need support" },
+  { id: "ready", emoji: "🚀", label: "Ready", desc: "Set for action" },
+];
+
+function InteractiveMoodWidget() {
+  const [selectedMood, setSelectedMood] = useState(null);
+
+  const handleSelect = (id) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setSelectedMood((prev) => (prev === id ? null : id));
+  };
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(100).duration(500)}
+      style={styles.moodWidgetCard}
+    >
+      <View style={styles.moodHeaderRow}>
+        <View style={styles.moodTitleContainer}>
+          <View style={styles.pulseDot} />
+          <Text style={styles.moodTitle}>How are you feeling today?</Text>
+        </View>
+        <Text style={styles.moodSub}>Daily Check-in</Text>
+      </View>
+
+      <View style={styles.moodGrid}>
+        {MOODS.map((m) => {
+          const isSelected = selectedMood === m.id;
+          return (
+            <Pressable
+              key={m.id}
+              onPress={() => handleSelect(m.id)}
+              style={({ pressed }) => [
+                styles.moodTile,
+                isSelected && styles.moodTileActive,
+                pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+              ]}
+            >
+              <View
+                style={[
+                  styles.moodEmojiCircle,
+                  isSelected && styles.moodEmojiCircleActive,
+                ]}
+              >
+                <Text style={styles.moodEmoji}>{m.emoji}</Text>
+              </View>
+              <View style={styles.moodTextGroup}>
+                <Text
+                  style={[
+                    styles.moodLabel,
+                    isSelected && styles.moodLabelActive,
+                  ]}
+                >
+                  {m.label}
+                </Text>
+                <Text
+                  style={[styles.moodDesc, isSelected && styles.moodDescActive]}
+                  numberOfLines={1}
+                >
+                  {m.desc}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Animated.View>
+  );
+}
+
+// 3. Category Tile with Spring Animation
+function CategoryTile({ item, routerPath }) {
+  const router = useRouter();
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.92, { damping: 14, stiffness: 280 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 12, stiffness: 250 });
+  };
+
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.push("programs/" + routerPath);
+  };
+
+  return (
+    <Pressable
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={handlePress}
+    >
+      <Animated.View style={[styles.categoryItem, animatedStyle]}>
+        <LinearGradient
+          colors={["#DCFCE7", "#F0FDF4"]}
+          style={styles.categoryIconCircle}
+        >
+          <Ionicons name={item.icon} size={24} color="#15803D" />
+        </LinearGradient>
+        <Text style={styles.categoryLabel} numberOfLines={2}>
+          {item.title}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// Main Client Dashboard Component
 export default function ClientDashboard() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
 
   const [firstName, setFirstName] = useState("");
   const [appointments, setAppointments] = useState([]);
@@ -47,7 +209,7 @@ export default function ClientDashboard() {
     try {
       setLoading(true);
 
-      // 1. Fetch First Name from Profiles
+      // 1. Fetch Profile
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name, first_name")
@@ -57,7 +219,7 @@ export default function ClientDashboard() {
       if (profile) {
         const derivedFirstName =
           profile.first_name ||
-          (profile.full_name ? profile.full_name.split(" ")[0] : "User");
+          (profile.full_name ? profile.full_name.split(" ")[0] : "Friend");
         setFirstName(derivedFirstName);
       }
 
@@ -82,9 +244,7 @@ export default function ClientDashboard() {
         ])
         .order("scheduled_start_time", { ascending: true });
 
-      if (aptError) {
-        console.error("Error fetching appointments:", aptError);
-      } else if (aptData) {
+      if (!aptError && aptData) {
         const formattedApts = aptData.map((item) => {
           const counselorName = item.counselor?.full_name
             ? `with ${item.counselor.full_name}`
@@ -121,7 +281,6 @@ export default function ClientDashboard() {
       if (!programError && programData) {
         setUpcomingPrograms(programData);
 
-        // 4. Check user's registered program IDs
         const programIds = programData.map((p) => p.id);
         if (programIds.length > 0) {
           const { data: userRegs } = await supabase
@@ -131,8 +290,7 @@ export default function ClientDashboard() {
             .in("program_id", programIds);
 
           if (userRegs) {
-            const regSet = new Set(userRegs.map((r) => r.program_id));
-            setRegisteredProgramIds(regSet);
+            setRegisteredProgramIds(new Set(userRegs.map((r) => r.program_id)));
           }
         }
       }
@@ -169,12 +327,12 @@ export default function ClientDashboard() {
   const getStatusBadgeStyle = (status) => {
     switch (status?.toLowerCase()) {
       case "scheduled":
-        return { bg: "#DCFCE7", text: "#15803D" }; // Green
+        return { bg: "#DCFCE7", text: "#15803D" };
       case "rescheduled":
       case "rescheduled_requested":
-        return { bg: "#E0F2FE", text: "#0369A1" }; // Blue
+        return { bg: "#E0F2FE", text: "#0369A1" };
       case "pending_payment":
-        return { bg: "#FEF3C7", text: "#B45309" }; // Amber/Yellow
+        return { bg: "#FEF3C7", text: "#B45309" };
       default:
         return { bg: "#F1F5F9", text: "#475569" };
     }
@@ -185,101 +343,130 @@ export default function ClientDashboard() {
       <View style={styles.maxContainer}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 32 },
+          ]}
         >
           {/* Header Banner */}
-          <ImageBackground
-            source={require("../../../assets/images/client/header.jpg")}
-            style={styles.headerBannerImage}
-            resizeMode="cover"
-          >
+          <View style={styles.heroWrapper}>
+            <LinearGradient
+              colors={["#FEF3C7", "#ECFDF5", "#F0FDF4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <AuroraBlobs width={width} height={height * 0.28} />
+
             <View style={styles.headerOverlay}>
               <View style={styles.topRow}>
                 <View style={styles.locationBadge}>
-                  <Ionicons name="location-sharp" size={14} color="#FFFFFF" />
+                  <Ionicons name="location-sharp" size={14} color="#15803D" />
                   <Text style={styles.locationText}>Kenya</Text>
                 </View>
 
                 <View style={styles.headerActions}>
                   <NotificationBell
                     userId={user?.id}
-                    color="#FFFFFF"
+                    color="#0F172A"
                     route="/notifications"
                   />
 
-                  <TouchableOpacity
+                  <Pressable
                     style={styles.logoutButton}
                     onPress={logout}
-                    activeOpacity={0.7}
+                    hitSlop={8}
                   >
                     <Ionicons
                       name="log-out-outline"
                       size={18}
-                      color="#FFD1D1"
+                      color="#DC2626"
                     />
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               </View>
 
-              <View style={styles.welcomeContainer}>
+              <Animated.View
+                entering={FadeInDown.duration(600).springify()}
+                style={styles.welcomeContainer}
+              >
                 <Text style={styles.welcomeTitle}>
-                  Karibu {firstName || "Friend"}!
+                  Karibu, {firstName || "Friend"}!
                 </Text>
+
+                <RotatingText
+                  phrases={[
+                    "Find your next mentor",
+                    "Book verified counseling",
+                    "Track life transitions",
+                  ]}
+                />
+
                 <Text style={styles.welcomeSubtitle}>
                   You don't have to navigate life transitions alone. Share your
                   journey with verified mentors and counselors.
                 </Text>
-              </View>
+              </Animated.View>
             </View>
-          </ImageBackground>
+          </View>
 
+          {/* Interactive Mood Widget */}
+          <View style={styles.moodWidgetWrapper}>
+            <InteractiveMoodWidget />
+          </View>
+
+          {/* Main Content Sections */}
           <View style={styles.sectionContainer}>
-            {/* Guidance Tracks Category Grid */}
-            <View style={styles.sectionBlock}>
+            {/* Guidance Category Grid */}
+            <Animated.View
+              entering={FadeInDown.delay(150).duration(500)}
+              style={styles.sectionBlock}
+            >
               <Text style={styles.sectionHeader}>
                 What guidance do you need today?
               </Text>
               <View style={styles.categoryGrid}>
                 {CATEGORIES.map((item) => (
-                  <TouchableOpacity
+                  <CategoryTile
                     key={item.id}
-                    style={styles.categoryItem}
-                    activeOpacity={0.7}
-                    onPress={() => router.push("programs/" + item.routerPath)}
-                  >
-                    <View style={styles.categoryIconCircle}>
-                      <Ionicons name={item.icon} size={22} color="#16A34A" />
-                    </View>
-                    <Text style={styles.categoryLabel} numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                  </TouchableOpacity>
+                    item={item}
+                    routerPath={item.routerPath}
+                  />
                 ))}
               </View>
-            </View>
+            </Animated.View>
 
             {/* Upcoming Events Block */}
             <View style={styles.sectionBlock}>
-              <Text style={styles.sectionHeader}>Upcoming Events</Text>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionHeader}>Upcoming Events</Text>
+              </View>
+
               {loading ? (
                 <ActivityIndicator size="small" color="#16A34A" />
               ) : upcomingPrograms.length > 0 ? (
-                upcomingPrograms.map((program) => {
+                upcomingPrograms.map((program, idx) => {
                   const isUserRegistered = registeredProgramIds.has(program.id);
 
                   return (
-                    <View
+                    <Animated.View
                       key={program.id}
-                      style={[styles.cardContainer, { marginBottom: 12 }]}
+                      entering={FadeInRight.delay(200 + idx * 100).duration(
+                        400,
+                      )}
+                      style={[styles.cardContainer, { marginBottom: 14 }]}
                     >
                       <View style={styles.cardHeaderRow}>
-                        <View style={styles.iconTag}>
+                        <LinearGradient
+                          colors={["#DCFCE7", "#F0FDF4"]}
+                          style={styles.iconTag}
+                        >
                           <Ionicons
                             name="calendar-outline"
                             size={20}
-                            color="#16A34A"
+                            color="#15803D"
                           />
-                        </View>
+                        </LinearGradient>
                         <View style={styles.badgeTag}>
                           <Text style={styles.badgeText}>
                             {program.category || "Event"}
@@ -309,110 +496,52 @@ export default function ClientDashboard() {
                         </Text>
                       </View>
 
-                      {/* Action Button: Conditional Rendering based on Registration */}
-                      {isUserRegistered ? (
-                        program.location_type === "virtual" ? (
-                          <TouchableOpacity
-                            style={[
-                              styles.primaryButton,
-                              { backgroundColor: "#0284C7" },
-                            ]}
-                            activeOpacity={0.8}
+                      <View style={{ marginTop: 14 }}>
+                        {isUserRegistered ? (
+                          <ShimmerButton
+                            label={
+                              program.location_type === "virtual"
+                                ? "Join Meeting"
+                                : program.location_type === "phone"
+                                  ? "Join Call"
+                                  : program.location_details
+                                    ? `Venue: ${program.location_details}`
+                                    : "Registered (Physical Venue)"
+                            }
                             onPress={() =>
                               openLocationAction(
                                 program.location_type,
                                 program.location_details,
                               )
                             }
-                          >
-                            <Ionicons
-                              name="videocam"
-                              size={16}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.primaryBtnText}>
-                              Join Meeting
-                            </Text>
-                          </TouchableOpacity>
-                        ) : program.location_type === "phone" ? (
-                          <TouchableOpacity
-                            style={[
-                              styles.primaryButton,
-                              { backgroundColor: "#2563EB" },
-                            ]}
-                            activeOpacity={0.8}
-                            onPress={() =>
-                              openLocationAction(
-                                program.location_type,
-                                program.location_details,
-                              )
-                            }
-                          >
-                            <Ionicons name="call" size={16} color="#FFFFFF" />
-                            <Text style={styles.primaryBtnText}>Join Call</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            style={[
-                              styles.primaryButton,
-                              { backgroundColor: "#475569" },
-                            ]}
-                            activeOpacity={0.8}
-                            onPress={() =>
-                              openLocationAction(
-                                program.location_type,
-                                program.location_details,
-                              )
-                            }
-                          >
-                            <Ionicons
-                              name="location"
-                              size={16}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.primaryBtnText}>
-                              {program.location_details
-                                ? `Venue: ${program.location_details}`
-                                : "Registered (Physical Venue)"}
-                            </Text>
-                          </TouchableOpacity>
-                        )
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.primaryButton}
-                          activeOpacity={0.8}
-                          onPress={() =>
-                            router.push({
-                              pathname: "programs/regPrograms",
-                              params: {
-                                programId: program.id,
-                                title: program.title,
-                                description: program.description,
-                                starts_at: program.starts_at,
-                                is_paid: program.is_paid,
-                                amount: program.amount,
-                              },
-                            })
-                          }
-                        >
-                          <Text style={styles.primaryBtnText}>
-                            Register Now
-                          </Text>
-                          <Ionicons
-                            name="arrow-forward"
-                            size={16}
-                            color="#FFFFFF"
                           />
-                        </TouchableOpacity>
-                      )}
-                    </View>
+                        ) : (
+                          <ShimmerButton
+                            label="Register Now"
+                            onPress={() =>
+                              router.push({
+                                pathname: "programs/regPrograms",
+                                params: {
+                                  programId: program.id,
+                                  title: program.title,
+                                  description: program.description,
+                                  starts_at: program.starts_at,
+                                  is_paid: program.is_paid,
+                                  amount: program.amount,
+                                },
+                              })
+                            }
+                          />
+                        )}
+                      </View>
+                    </Animated.View>
                   );
                 })
               ) : (
                 <View style={styles.emptyStateCard}>
                   <Text style={styles.emptyTitle}>No Upcoming Events</Text>
                   <Text style={styles.emptySubtitle}>
-                    Check back later for new programs.
+                    Check back later for new programs and workshops.
                   </Text>
                 </View>
               )}
@@ -423,40 +552,35 @@ export default function ClientDashboard() {
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionHeader}>Pending Appointments</Text>
                 {appointments.length > 0 && (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
+                  <Pressable
+                    hitSlop={8}
                     onPress={() => router.push("appointment")}
                   >
                     <Text style={styles.seeAllText}>See All</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
               </View>
 
               {loading ? (
                 <ActivityIndicator size="small" color="#16A34A" />
               ) : appointments.length > 0 ? (
-                appointments.map((apt) => {
+                appointments.map((apt, idx) => {
                   const statusStyle = getStatusBadgeStyle(apt.status);
                   return (
-                    <View
+                    <Animated.View
                       key={apt.id}
-                      style={[styles.appointmentCard, { marginBottom: 10 }]}
+                      entering={FadeInDown.delay(200 + idx * 100).duration(400)}
+                      style={[styles.appointmentCard, { marginBottom: 12 }]}
                     >
                       <View style={styles.appointmentIconWrapper}>
                         <Ionicons
                           name="person-outline"
-                          size={24}
+                          size={22}
                           color="#0F172A"
                         />
                       </View>
                       <View style={styles.appointmentContent}>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
+                        <View style={styles.aptHeaderRow}>
                           <Text style={[styles.cardTitle, { flex: 1 }]}>
                             {apt.title}
                           </Text>
@@ -484,21 +608,24 @@ export default function ClientDashboard() {
                           />
                           <Text style={styles.timeText}>{apt.dateTime}</Text>
                         </View>
-                        <TouchableOpacity
+
+                        <Pressable
                           style={styles.secondaryButton}
-                          activeOpacity={0.8}
                           onPress={() => router.push("appointment")}
                         >
                           <Text style={styles.secondaryBtnText}>
                             View Session Details
                           </Text>
-                        </TouchableOpacity>
+                        </Pressable>
                       </View>
-                    </View>
+                    </Animated.View>
                   );
                 })
               ) : (
-                <View style={styles.emptyStateCard}>
+                <Animated.View
+                  entering={FadeInDown.duration(400)}
+                  style={styles.emptyStateCard}
+                >
                   <View style={styles.emptyIconCircle}>
                     <Ionicons
                       name="calendar-clear-outline"
@@ -511,19 +638,13 @@ export default function ClientDashboard() {
                     Connect with a mentor or counselor to help guide your next
                     step.
                   </Text>
-                  <TouchableOpacity
-                    style={styles.primaryButton}
-                    activeOpacity={0.8}
-                    onPress={() => router.push("appointment")}
-                  >
-                    <Ionicons
-                      name="add-circle-outline"
-                      size={18}
-                      color="#FFFFFF"
+                  <View style={{ width: "100%", marginTop: 16 }}>
+                    <ShimmerButton
+                      label="Book a Session"
+                      onPress={() => router.push("appointment")}
                     />
-                    <Text style={styles.primaryBtnText}>Book a Session</Text>
-                  </TouchableOpacity>
-                </View>
+                  </View>
+                </Animated.View>
               )}
             </View>
           </View>

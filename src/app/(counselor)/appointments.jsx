@@ -38,7 +38,7 @@ export default function AppointmentsScreen() {
   const [expandedId, setExpandedId] = useState(null);
 
   // Modal State
-  const [activeModal, setActiveModal] = useState(null); // 'cancel' | 'attended' | 'transfer' | 'postpone'
+  const [activeModal, setActiveModal] = useState(null); // 'cancel' | 'attended' | 'transfer' | 'postpone' | 'noshow'
   const [selectedSession, setSelectedSession] = useState(null);
   const [modalInput, setModalInput] = useState("");
   const [postponeDate, setPostponeDate] = useState("");
@@ -199,26 +199,35 @@ export default function AppointmentsScreen() {
     fetchInitialData();
   }, []);
 
-  // Filter Active Sessions vs History
+  // Check if session start or end time is in the past
+  const isPastSession = useCallback((isoString) => {
+    if (!isoString) return false;
+    return new Date(isoString).getTime() < Date.now();
+  }, []);
+
+  // Closed status list
+  const CLOSED_STATUSES = useMemo(
+    () => [
+      "completed",
+      "cancelled_by_client",
+      "cancelled_by_counselor",
+      "rescheduled_requested",
+      "no_show",
+    ],
+    [],
+  );
+
+  // Active Sessions: Not explicitly closed
   const activeSessions = useMemo(() => {
     return appointments.filter(
-      (item) =>
-        item.status !== "completed" &&
-        item.status !== "cancelled_by_client" &&
-        item.status !== "cancelled_by_counselor" &&
-        item.status !== "rescheduled_requested",
+      (item) => !CLOSED_STATUSES.includes(item.status),
     );
-  }, [appointments]);
+  }, [appointments, CLOSED_STATUSES]);
 
+  // History Sessions: Explicitly closed
   const historySessions = useMemo(() => {
-    return appointments.filter(
-      (item) =>
-        item.status === "completed" ||
-        item.status === "cancelled_by_client" ||
-        item.status === "cancelled_by_counselor" ||
-        item.status === "rescheduled_requested",
-    );
-  }, [appointments]);
+    return appointments.filter((item) => CLOSED_STATUSES.includes(item.status));
+  }, [appointments, CLOSED_STATUSES]);
 
   // Handle Day Toggling
   const handleDayPress = (day) => {
@@ -281,14 +290,12 @@ export default function AppointmentsScreen() {
         });
       }
 
-      // 1. Optimistically update local appointments state
       setAppointments((prevAppointments) =>
         prevAppointments.map((item) =>
           item.id === id ? { ...item, session_link: trimmedLink } : item,
         ),
       );
 
-      // 2. Clear editing buffer for this appointment ID
       setEditingLinks((prev) => {
         const updated = { ...prev };
         delete updated[id];
@@ -296,8 +303,6 @@ export default function AppointmentsScreen() {
       });
 
       Alert.alert("Success", "Virtual meeting link updated!");
-
-      // 3. Re-fetch appointments to ensure sync with Supabase
       await fetchCounselorAppointments();
     } catch (err) {
       console.error("Error updating session link:", err);
@@ -398,6 +403,20 @@ export default function AppointmentsScreen() {
           "Completed",
           "Session marked as attended and moved to history.",
         );
+      } else if (activeModal === "noshow") {
+        // NO SHOW: Moves to History
+        const { error } = await supabase
+          .from("appointments")
+          .update({
+            status: "no_show",
+            action_reason: modalInput.trim() || "Client did not show up",
+            action_by_role: "counselor",
+            action_at: new Date().toISOString(),
+          })
+          .eq("id", selectedSession.id);
+
+        if (error) throw error;
+        Alert.alert("No Show", "Marked as No Show and moved to history.");
       } else if (activeModal === "transfer") {
         // TRANSFER: Moves to History
         const { error } = await supabase
@@ -529,6 +548,7 @@ export default function AppointmentsScreen() {
           ) : (
             activeSessions.map((session) => {
               const isExpanded = expandedId === session.id;
+              const isPast = isPastSession(session.scheduled_start_time);
               const client = session.client;
               const clientName = client
                 ? `${client.first_name || ""} ${client.surname || ""}`.trim()
@@ -540,7 +560,13 @@ export default function AppointmentsScreen() {
                   : session.session_link || "";
 
               return (
-                <View key={session.id} style={styles.sessionCard}>
+                <View
+                  key={session.id}
+                  style={[
+                    styles.sessionCard,
+                    isPast && { borderColor: "#F59E0B" },
+                  ]}
+                >
                   {/* Basic Card Overview */}
                   <View style={styles.cardHeader}>
                     <View style={styles.badge}>
@@ -548,9 +574,21 @@ export default function AppointmentsScreen() {
                         {session.counseling_type} Session
                       </Text>
                     </View>
-                    <Text style={styles.timeText}>
-                      {formatDateTime(session.scheduled_start_time)}
-                    </Text>
+
+                    <View style={styles.timeContainer}>
+                      {isPast && (
+                        <View style={styles.pastDueBadge}>
+                          <Text style={styles.pastDueText}>
+                            ⚠️ Action Required
+                          </Text>
+                        </View>
+                      )}
+                      <Text
+                        style={[styles.timeText, isPast && styles.timeTextPast]}
+                      >
+                        {formatDateTime(session.scheduled_start_time)}
+                      </Text>
+                    </View>
                   </View>
 
                   <Text style={styles.clientName}>{clientName}</Text>
@@ -577,7 +615,7 @@ export default function AppointmentsScreen() {
                     />
                   </TouchableOpacity>
 
-                  {/* Styled Expanded Intake Details */}
+                  {/* Intake details ... */}
                   {isExpanded && (
                     <View style={styles.intakeCard}>
                       <Text style={styles.intakeSectionHeader}>
@@ -735,6 +773,24 @@ export default function AppointmentsScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
+                      style={[
+                        styles.actionChip,
+                        { backgroundColor: "#FED7AA" },
+                      ]}
+                      onPress={() => openActionModal("noshow", session)}
+                    >
+                      <Text
+                        style={{
+                          color: "#C2410C",
+                          fontWeight: "700",
+                          fontSize: 12,
+                        }}
+                      >
+                        No Show
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
                       style={[styles.actionChip, styles.chipPostpone]}
                       onPress={() => openActionModal("postpone", session)}
                     >
@@ -788,6 +844,7 @@ export default function AppointmentsScreen() {
                 item.status === "cancelled_by_client" ||
                 item.status === "cancelled_by_counselor";
               const isTransferred = item.status === "rescheduled_requested";
+              const isNoShow = item.status === "no_show";
 
               const counselorReview = item.reviews?.find(
                 (r) => r.reviewer_role === "counselor",
@@ -805,13 +862,16 @@ export default function AppointmentsScreen() {
                         styles.historyStatus,
                         isCancelled && styles.statusCancelled,
                         isTransferred && styles.statusTransferred,
+                        isNoShow && { color: "#EA580C" },
                       ]}
                     >
                       {isCancelled
                         ? "Cancelled"
                         : isTransferred
                           ? "Transferred"
-                          : "Attended"}
+                          : isNoShow
+                            ? "No Show"
+                            : "Attended"}
                     </Text>
                   </View>
 
@@ -863,6 +923,7 @@ export default function AppointmentsScreen() {
             <Text style={styles.modalTitle}>
               {activeModal === "cancel" && "Cancel Appointment"}
               {activeModal === "attended" && "Mark as Attended"}
+              {activeModal === "noshow" && "Mark as No Show"}
               {activeModal === "transfer" && "Transfer Session"}
               {activeModal === "postpone" && "Postpone Session"}
             </Text>
@@ -882,7 +943,9 @@ export default function AppointmentsScreen() {
               placeholder={
                 activeModal === "attended"
                   ? "Leave session notes/clinical summary..."
-                  : "State reason..."
+                  : activeModal === "noshow"
+                    ? "Note any relevant missing details..."
+                    : "State reason..."
               }
               placeholderTextColor="#94A3B8"
               multiline
