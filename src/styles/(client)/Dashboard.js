@@ -1,6 +1,4 @@
-import { Dimensions, StyleSheet } from "react-native";
-
-const { width } = Dimensions.get("window");
+import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
   container: {
@@ -9,13 +7,15 @@ export const styles = StyleSheet.create({
   },
   maxContainer: {
     width: "100%",
-    maxWidth: 600,
+    maxWidth: 680,
     alignSelf: "center",
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 32,
   },
+
+  /* ------------------------------ Header ------------------------------ */
   heroWrapper: {
     width: "100%",
     minHeight: 240,
@@ -59,11 +59,21 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
   logoutButton: {
     backgroundColor: "#FEF2F2",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -78,134 +88,36 @@ export const styles = StyleSheet.create({
     color: "#0F172A",
     letterSpacing: -0.5,
   },
-  heroHighlightText: {
-    fontSize: 17,
+  rotatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  rotatingLabel: {
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  rotatingHighlight: {
+    fontSize: 15,
     fontWeight: "800",
     color: "#16A34A",
-    marginTop: 2,
   },
   welcomeSubtitle: {
     fontSize: 13,
     color: "#475569",
-    marginTop: 6,
+    marginTop: 10,
     lineHeight: 19,
     fontWeight: "500",
+    maxWidth: 420,
   },
 
-  // Interactive Mood Check-in Styles
-  moodWidgetWrapper: {
-    paddingHorizontal: 20,
-    marginTop: 18,
-    marginBottom: 4,
-  },
-  moodWidgetCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 3,
-  },
-  moodHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  moodTitleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#22C55E",
-  },
-  moodTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#0F172A",
-    letterSpacing: -0.2,
-  },
-  moodSub: {
-    fontSize: 11,
-    color: "#64748B",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  moodGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  moodTile: {
-    width: "48.5%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1.5,
-    borderColor: "#F1F5F9",
-  },
-  moodTileActive: {
-    backgroundColor: "#F0FDF4",
-    borderColor: "#22C55E",
-  },
-  moodEmojiCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  moodEmojiCircleActive: {
-    backgroundColor: "#DCFCE7",
-    borderColor: "#86EFAC",
-  },
-  moodEmoji: {
-    fontSize: 16,
-  },
-  moodTextGroup: {
-    flex: 1,
-  },
-  moodLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#334155",
-  },
-  moodLabelActive: {
-    color: "#15803D",
-    fontWeight: "800",
-  },
-  moodDesc: {
-    fontSize: 10,
-    fontWeight: "500",
-    color: "#94A3B8",
-    marginTop: 1,
-  },
-  moodDescActive: {
-    color: "#166534",
-  },
-
-  // Main Sections
+  /* ------------------------------ Sections ----------------------------- */
   sectionContainer: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 24,
+    paddingTop: 20,
+    gap: 26,
   },
   sectionBlock: {
     width: "100%",
@@ -228,30 +140,30 @@ export const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#16A34A",
   },
+
+  /* ---------------------------- Category grid --------------------------- */
   categoryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     rowGap: 16,
   },
   categoryItem: {
-    width: (width > 600 ? 600 : width - 40) / 4 - 6,
     alignItems: "center",
   },
+  categoryPress: {
+    alignItems: "center",
+    width: "100%",
+  },
   categoryIconCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "#86EFAC",
-    shadowColor: "#16A34A",
+    shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
   },
   categoryLabel: {
     fontSize: 12,
@@ -260,6 +172,128 @@ export const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 16,
   },
+
+  /* -------------------------- Next session hero -------------------------- */
+  heroCard: {
+    borderRadius: 26,
+    padding: 20,
+    overflow: "hidden",
+    shadowColor: "#16A34A",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  heroDecorA: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    top: -60,
+    right: -50,
+  },
+  heroDecorB: {
+    position: "absolute",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    bottom: -40,
+    left: -30,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  heroChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  heroChipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: 0.6,
+  },
+  heroRelative: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.9)",
+  },
+  heroTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    marginTop: 14,
+    letterSpacing: -0.3,
+  },
+  heroTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+  },
+  heroTime: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.92)",
+  },
+  heroActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18,
+  },
+  heroBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 14,
+  },
+  heroBtnPrimary: {
+    backgroundColor: "#FFFFFF",
+  },
+  heroBtnGhost: {
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+  },
+  heroBtnText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  pulseWrap: {
+    width: 8,
+    height: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pulseRing: {
+    position: "absolute",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#FFFFFF",
+  },
+
+  /* ------------------------------ Event card ----------------------------- */
   cardContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 22,
@@ -272,26 +306,39 @@ export const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 2,
   },
-  cardHeaderRow: {
+  eventHeaderRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
+    gap: 14,
+    marginBottom: 10,
   },
-  iconTag: {
-    width: 40,
-    height: 40,
+  dateBlock: {
+    width: 50,
+    height: 54,
     borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "#F0FDF4",
     borderWidth: 1,
-    borderColor: "#86EFAC",
+    borderColor: "#BBF7D0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateDay: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#15803D",
+    lineHeight: 20,
+  },
+  dateMonth: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#16A34A",
+    letterSpacing: 0.5,
   },
   badgeTag: {
     backgroundColor: "#F1F5F9",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    alignSelf: "flex-start",
   },
   badgeText: {
     fontSize: 11,
@@ -300,75 +347,110 @@ export const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: "#0F172A",
   },
   cardSubText: {
     fontSize: 13,
     color: "#64748B",
-    marginTop: 4,
+    marginTop: 6,
     lineHeight: 18,
   },
-  appointmentCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 22,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
+  metaWrap: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
   },
-  aptHeaderRow: {
+  metaPill: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-  },
-  appointmentIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    gap: 5,
     backgroundColor: "#F8FAFC",
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  metaPillText: {
+    fontSize: 11,
+    color: "#475569",
+    fontWeight: "600",
+  },
+  metaFree: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#BBF7D0",
+  },
+  metaPaid: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+  },
+  primaryButton: {
+    backgroundColor: "#16A34A",
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+  },
+  primaryBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
+  /* --------------------------- Appointment card --------------------------- */
+  appointmentCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+    marginBottom: 10,
+  },
+  appointmentIconWrapper: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#F1F5F9",
     justifyContent: "center",
     alignItems: "center",
   },
   appointmentContent: {
     flex: 1,
   },
+  appointmentTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   timeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: 6,
+    marginTop: 4,
   },
   timeText: {
     fontSize: 12,
     color: "#64748B",
     fontWeight: "500",
   },
-  secondaryButton: {
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    alignSelf: "flex-start",
-  },
-  secondaryBtnText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#334155",
-  },
+
+  /* -------------------------------- Empty state ---------------------------- */
   emptyStateCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 22,
@@ -398,5 +480,10 @@ export const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 4,
     lineHeight: 18,
+  },
+
+  /* ---------------------------------- Skeleton ------------------------------ */
+  skeleton: {
+    backgroundColor: "#E2E8F0",
   },
 });
