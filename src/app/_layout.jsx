@@ -7,9 +7,9 @@ import {
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { createContext, useContext, useEffect, useState } from "react";
-import { SafeAreaProvider } from "react-native-safe-area-context";
 import { supabase } from "../../libs/supabase";
 import Preloader from "../components/preLoader";
+import { NotificationsProvider } from "../context/NotificationsContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -176,10 +176,10 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
-      <AuthContext.Provider value={{ user, login, logout, checkStatus }}>
+    <AuthContext.Provider value={{ user, login, logout, checkStatus }}>
+      <NotificationsProvider userId={user?.id}>
         <Slot />
-      </AuthContext.Provider>
-    </SafeAreaProvider>
+      </NotificationsProvider>
+    </AuthContext.Provider>
   );
 }
