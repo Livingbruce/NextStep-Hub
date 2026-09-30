@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../libs/supabase";
+import { sendEmail } from "../../services/emailServer";
+import { staffInviteEmail } from "../../services/emailTemplates";
 import { styles } from "../../styles/(admin)/staff";
 
 export default function StaffManagement() {
@@ -127,6 +129,11 @@ export default function StaffManagement() {
       ]);
 
       if (error) throw error;
+
+      sendEmail({
+        to: cleanEmail,
+        ...staffInviteEmail({ role: whitelistRole }),
+      });
 
       setWhitelistEmail("");
       Keyboard.dismiss();

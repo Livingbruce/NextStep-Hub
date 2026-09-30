@@ -30,6 +30,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import * as Device from "expo-device";
 import { supabase } from "../../../libs/supabase";
 import AuroraBlobs from "../../components/landing/AuroraBlobs";
 import FloatingInput from "../../components/landing/floatingInput";
@@ -43,6 +44,8 @@ import {
   SUPPORT_EMAIL,
   getLoginError,
 } from "../../components/loginErrors";
+import { sendEmail } from "../../services/emailServer";
+import { formatWhen, loginAlertEmail } from "../../services/emailTemplates";
 import { useAuth } from "../_layout";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -169,7 +172,9 @@ export default function LoginScreen() {
       // 2. Load the profile (maybeSingle: a missing row is not a crash)
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("role, id, full_name, approved, suspended")
+        .select(
+          "role, id, full_name, first_name, approved, suspended, last_login_at",
+        )
         .eq("id", authData.user.id)
         .maybeSingle();
 
@@ -179,12 +184,30 @@ export default function LoginScreen() {
       }
 
       if (!profile) {
-        // Auth account exists but sign-up never created the profile row.
         await supabase.auth.signOut();
         const missing = new Error("Profile not found");
         missing.name = PROFILE_MISSING;
         throw missing;
       }
+
+      if (profile.last_login_at) {
+        sendEmail({
+          to: cleanEmail,
+          ...loginAlertEmail({
+            firstName: profile.first_name || "there",
+            device:
+              [Device.brand, Device.modelName, Device.osName]
+                .filter(Boolean)
+                .join(" ") || "Unknown device",
+            time: formatWhen(new Date().toISOString()),
+          }),
+        });
+      }
+      supabase
+        .from("profiles")
+        .update({ last_login_at: new Date().toISOString() })
+        .eq("id", profile.id)
+        .then(() => {});
 
       // 3. Hand over to the root layout, which routes by role/approval.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
