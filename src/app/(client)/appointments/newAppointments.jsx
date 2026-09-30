@@ -22,6 +22,11 @@ import {
   notifyAdmins,
 } from "../../../../libs/notifications";
 import { supabase } from "../../../../libs/supabase";
+import { sendEmail } from "../../../services/emailServer";
+import {
+  clientBookingEmail,
+  counselorBookingEmail,
+} from "../../../services/emailTemplates";
 import { styles } from "../../../styles/(client)/appointments/newAppointments";
 
 const STORAGE_KEY = "@booking_draft_v1";
@@ -127,7 +132,7 @@ export default function NewAppointmentScreen() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "id, first_name, surname, specializations, about, years_of_experience, avatar_url, role, absent_days",
+          "id, first_name, surname, email, specializations, about, years_of_experience, avatar_url, role, absent_days",
         )
         .eq("role", "Counselor")
         .eq("approved", true)
@@ -420,6 +425,45 @@ export default function NewAppointmentScreen() {
         title: "New Appointment Created",
         body: `A new ${counselingType} session was booked.`,
       });
+
+      const counselor = counselors.find((c) => c.id === selectedCounselorId);
+      const { data: clientProfile } = await supabase
+        .from("profiles")
+        .select("first_name, surname")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const clientName =
+        [clientProfile?.first_name, clientProfile?.surname]
+          .filter(Boolean)
+          .join(" ") || "Client";
+      const counselorName = counselor
+        ? [counselor.first_name, counselor.surname].filter(Boolean).join(" ")
+        : "your counselor";
+
+      if (user.email) {
+        sendEmail({
+          to: user.email,
+          ...clientBookingEmail({
+            clientName: clientProfile?.first_name || "there",
+            counselorName,
+            counselingType,
+            startTime: startTime.toISOString(),
+            paid: isPaid,
+          }),
+        });
+      }
+      if (counselor?.email) {
+        sendEmail({
+          to: counselor.email,
+          ...counselorBookingEmail({
+            counselorName: counselor.first_name || "there",
+            clientName,
+            counselingType,
+            startTime: startTime.toISOString(),
+          }),
+        });
+      }
 
       await AsyncStorage.removeItem(STORAGE_KEY);
       setStep(11);

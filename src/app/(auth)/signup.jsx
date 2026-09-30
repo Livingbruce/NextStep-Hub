@@ -577,6 +577,14 @@ export default function SignupScreen() {
         throw profileError;
       }
 
+      sendEmail({
+        to: cleanEmail,
+        ...welcomeEmail({
+          firstName: formData.firstName.trim(),
+          role: selectedRole,
+        }),
+      });
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {},
       );
