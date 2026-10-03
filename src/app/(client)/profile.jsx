@@ -1,75 +1,161 @@
 import { Ionicons } from "@expo/vector-icons";
 import { decode } from "base64-arraybuffer";
+import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
-  TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Animated, {
   FadeIn,
   FadeInDown,
   FadeOut,
-  Layout,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../libs/supabase";
+import PressableScale from "../../components/client/appointments/PressableScale";
+import {
+  OptionChips,
+  ProfileField,
+} from "../../components/client/profile/ProfileField";
+import ProfileSkeleton from "../../components/client/profile/ProfileSkeleton";
 import { styles } from "../../styles/(client)/Profile";
+import { pui } from "../../styles/(client)/profile/ui";
 
-// Animated components
-const AnimatedTouchableOpacity =
-  Animated.createAnimatedComponent(TouchableOpacity);
+const GENDERS = ["Male", "Female", "Prefer not to say"];
+const RELATIONSHIPS = [
+  "Single",
+  "Married",
+  "Dating (In a relationship)",
+  "Divorced",
+  "Separated",
+  "Widowed",
+  "Prefer not to say",
+];
+
+// Fields counted towards "profile completion", with a friendly name for the hint.
+const TRACKED = [
+  ["phoneNo", "your phone number"],
+  ["gender", "your gender"],
+  ["age", "your age"],
+  ["county", "your county"],
+  ["relationshipStatus", "your relationship status"],
+  ["religion", "your religion"],
+  ["emergencyPhone", "an emergency contact"],
+  ["emergencyRelationship", "your emergency contact's relationship to you"],
+];
+
+const EMPTY = {
+  id: null,
+  email: "",
+  firstName: "",
+  middleName: "",
+  surname: "",
+  fullName: "",
+  phoneNo: "",
+  gender: "",
+  age: "",
+  county: "",
+  relationshipStatus: "",
+  religion: "",
+  emergencyPhone: "",
+  emergencyRelationship: "",
+  profileImageUri: null,
+};
+
+const GAP = 16;
+
+function Section({ title, icon, index, style, children }) {
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 80)
+        .duration(420)
+        .springify()
+        .damping(18)}
+      layout={LinearTransition.duration(260)}
+      style={[styles.sectionCard, { marginBottom: 0 }, style]}
+    >
+      <View style={pui.cardTitleRow}>
+        <View style={pui.cardIcon}>
+          <Ionicons name={icon} size={15} color="#16A34A" />
+        </View>
+        <Text style={pui.cardTitle}>{title}</Text>
+      </View>
+      {children}
+    </Animated.View>
+  );
+}
+
+function Completion({ percent, hint }) {
+  const pct = useSharedValue(0);
+  useEffect(() => {
+    pct.set(withTiming(percent, { duration: 700 }));
+  }, [percent, pct]);
+  const fill = useAnimatedStyle(() => ({ width: `${pct.get()}%` }));
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(60).duration(400)}
+      style={pui.completion}
+    >
+      <View style={pui.completionTop}>
+        <Text style={pui.completionTitle}>
+          {percent === 100 ? "Profile complete" : "Profile completion"}
+        </Text>
+        <Text style={pui.completionPct}>{percent}%</Text>
+      </View>
+      <View style={pui.track}>
+        <Animated.View style={[pui.fill, fill]} />
+      </View>
+      {!!hint && <Text style={pui.completionHint}>{hint}</Text>}
+    </Animated.View>
+  );
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
 
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [profile, setProfile] = useState(EMPTY);
 
-  // Micro-interaction scale shared value
-  const avatarScale = useSharedValue(1);
+  const saved = useRef(EMPTY); // last saved snapshot, used by Cancel
+  const hasLoaded = useRef(false);
 
-  const avatarAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: avatarScale.value }],
-  }));
-
-  const [profile, setProfile] = useState({
-    id: null,
-    email: "",
-    firstName: "",
-    middleName: "",
-    surname: "",
-    fullName: "",
-    phoneNo: "",
-    gender: "",
-    age: "",
-    county: "",
-    relationshipStatus: "",
-    religion: "",
-    emergencyPhone: "",
-    emergencyRelationship: "",
-    profileImageUri: null,
-  });
+  const columns = width >= 720 ? 2 : 1;
 
   useEffect(() => {
     fetchProfile();
   }, []);
 
+  const set = (field) => (value) =>
+    setProfile((prev) => ({ ...prev, [field]: value }));
+
+  const buzz = (type) => Haptics.notificationAsync(type).catch(() => {});
+
   const fetchProfile = async () => {
     try {
-      setLoading(true);
+      if (!hasLoaded.current) setLoading(true);
 
       const {
         data: { user },
@@ -81,78 +167,80 @@ export default function ProfileScreen() {
         return;
       }
 
-      const { data: dbProfile, error: dbError } = await supabase
+      const { data: db, error: dbError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
 
-      if (dbError || !dbProfile) {
+      if (dbError || !db) {
         console.error("Profile fetch error:", dbError);
-        Alert.alert("Error", "Could not load your profile.");
+        Alert.alert("Couldn't load profile", "Pull down to try again.");
         return;
       }
 
-      if (dbProfile.role?.toLowerCase() !== "client") {
+      if (db.role?.toLowerCase() !== "client") {
         Alert.alert(
-          "Unauthorized",
+          "Not available",
           "This profile page is only available to clients.",
         );
         return;
       }
 
-      const fullName =
-        dbProfile.full_name ||
-        [dbProfile.first_name, dbProfile.middle_name, dbProfile.surname]
-          .filter(Boolean)
-          .join(" ");
+      const next = {
+        id: db.id,
+        email: user.email || db.email || "",
+        firstName: db.first_name || "",
+        middleName: db.middle_name || "",
+        surname: db.surname || "",
+        fullName:
+          db.full_name ||
+          [db.first_name, db.middle_name, db.surname].filter(Boolean).join(" "),
+        phoneNo: db.phone_no || "",
+        gender: db.gender || "",
+        age: db.age !== null && db.age !== undefined ? String(db.age) : "",
+        county: db.county || "",
+        relationshipStatus: db.relationship_status || "",
+        religion: db.religion || "",
+        emergencyPhone: db.emergency_phone || "",
+        emergencyRelationship: db.emergency_relationship || "",
+        profileImageUri: db.avatar_url || null,
+      };
 
-      setProfile({
-        id: dbProfile.id,
-        email: user.email || dbProfile.email || "",
-        firstName: dbProfile.first_name || "",
-        middleName: dbProfile.middle_name || "",
-        surname: dbProfile.surname || "",
-        fullName,
-        phoneNo: dbProfile.phone_no || "",
-        gender: dbProfile.gender || "",
-        age:
-          dbProfile.age !== null && dbProfile.age !== undefined
-            ? String(dbProfile.age)
-            : "",
-        county: dbProfile.county || "",
-        relationshipStatus: dbProfile.relationship_status || "",
-        religion: dbProfile.religion || "",
-        emergencyPhone: dbProfile.emergency_phone || "",
-        emergencyRelationship: dbProfile.emergency_relationship || "",
-        profileImageUri: dbProfile.avatar_url || null,
-      });
-
+      saved.current = next;
+      setProfile(next);
       setImageError(false);
+      hasLoaded.current = true;
     } catch (error) {
       console.error("Error fetching profile:", error);
-      Alert.alert("Error", "Could not load your profile.");
+      Alert.alert("Couldn't load profile", "Pull down to try again.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const getInitials = (firstName, surname) => {
-    const first = firstName?.trim()?.charAt(0)?.toUpperCase() || "";
-    const last = surname?.trim()?.charAt(0)?.toUpperCase() || "";
+  const onRefresh = () => {
+    if (isEditing) return setRefreshing(false);
+    setRefreshing(true);
+    fetchProfile();
+  };
 
-    return `${first}${last}` || "C";
+  // ---- Avatar ----
+  const getInitials = () => {
+    const f = profile.firstName?.trim()?.charAt(0)?.toUpperCase() || "";
+    const l = profile.surname?.trim()?.charAt(0)?.toUpperCase() || "";
+    return `${f}${l}` || "C";
   };
 
   const handlePickImage = async () => {
     try {
-      const permissionResult =
+      const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permissionResult.granted) {
+      if (!permission.granted) {
         Alert.alert(
-          "Permission Required",
-          "You need to allow access to your photos to update your profile picture.",
+          "Permission needed",
+          "Allow access to your photos to update your profile picture.",
         );
         return;
       }
@@ -165,17 +253,12 @@ export default function ProfileScreen() {
         base64: true,
       });
 
-      if (result.canceled || !result.assets?.length) {
-        return;
-      }
-
+      if (result.canceled || !result.assets?.length) return;
       const asset = result.assets[0];
-
       if (!asset.base64) {
-        Alert.alert("Upload Failed", "Could not read the selected image.");
+        Alert.alert("Upload failed", "Could not read the selected image.");
         return;
       }
-
       await uploadProfileImage(asset);
     } catch (error) {
       console.error("Image picker error:", error);
@@ -185,120 +268,91 @@ export default function ProfileScreen() {
 
   const uploadProfileImage = async (asset) => {
     try {
-      setSaving(true);
+      setUploading(true);
 
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
-
       if (userError || !user) {
-        Alert.alert(
-          "Authentication Error",
-          "Your session has expired. Please log in again.",
-        );
+        Alert.alert("Session expired", "Please log in again.");
         return;
       }
 
-      if (!asset.base64) {
-        throw new Error("Image data is missing.");
-      }
+      let ext = asset.uri?.split(".").pop()?.toLowerCase() || "jpeg";
+      if (ext === "jpg") ext = "jpeg";
+      if (!["jpeg", "png", "webp"].includes(ext)) ext = "jpeg";
 
-      let fileExt = asset.uri?.split(".").pop()?.toLowerCase() || "jpeg";
-
-      if (fileExt === "jpg") {
-        fileExt = "jpeg";
-      }
-
-      if (!["jpeg", "png", "webp"].includes(fileExt)) {
-        fileExt = "jpeg";
-      }
-
-      const contentType = `image/${fileExt}`;
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      const fileData = decode(asset.base64);
-
-      if (!fileData) {
-        throw new Error("Could not decode image.");
-      }
+      const fileName = `${user.id}/${Date.now()}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(fileName, fileData, {
-          contentType,
+        .upload(fileName, decode(asset.base64), {
+          contentType: `image/${ext}`,
           upsert: false,
         });
-
-      if (uploadError) {
-        console.error("Storage upload error:", uploadError);
-        throw uploadError;
-      }
+      if (uploadError) throw uploadError;
 
       const {
         data: { publicUrl },
       } = supabase.storage.from("avatars").getPublicUrl(fileName);
-
-      if (!publicUrl) {
-        throw new Error("Could not generate profile image URL.");
-      }
+      if (!publicUrl) throw new Error("Could not generate the image URL.");
 
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({
-          avatar_url: publicUrl,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
         .eq("id", user.id);
+      if (updateError) throw updateError;
 
-      if (updateError) {
-        console.error("Avatar profile update error:", updateError);
-        throw updateError;
-      }
-
-      setProfile((prev) => ({
-        ...prev,
-        profileImageUri: publicUrl,
-      }));
-
+      saved.current = { ...saved.current, profileImageUri: publicUrl };
+      setProfile((prev) => ({ ...prev, profileImageUri: publicUrl }));
       setImageError(false);
-      Alert.alert("Success", "Profile picture updated successfully!");
+      buzz(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error("Avatar upload error:", error);
+      buzz(Haptics.NotificationFeedbackType.Error);
       Alert.alert(
-        "Upload Failed",
+        "Upload failed",
         error?.message || "Could not upload profile picture.",
       );
     } finally {
-      setSaving(false);
+      setUploading(false);
     }
   };
 
+  // ---- Save / cancel ----
   const handleSaveProfile = async () => {
-    try {
-      if (
-        !profile.firstName.trim() ||
-        !profile.surname.trim() ||
-        !profile.phoneNo.trim()
-      ) {
-        Alert.alert(
-          "Required Fields",
-          "First name, surname, and phone number cannot be empty.",
+    if (
+      !profile.firstName.trim() ||
+      !profile.surname.trim() ||
+      !profile.phoneNo.trim()
+    ) {
+      buzz(Haptics.NotificationFeedbackType.Warning);
+      return Alert.alert(
+        "Missing details",
+        "First name, surname and phone number are required.",
+      );
+    }
+    if (profile.age) {
+      const age = parseInt(profile.age, 10);
+      if (Number.isNaN(age) || age < 10 || age > 100) {
+        buzz(Haptics.NotificationFeedbackType.Warning);
+        return Alert.alert(
+          "Check your age",
+          "Enter an age between 10 and 100.",
         );
-        return;
       }
+    }
 
+    try {
       setSaving(true);
 
       const {
         data: { user },
         error: authError,
       } = await supabase.auth.getUser();
-
       if (authError || !user) {
-        Alert.alert(
-          "Authentication Error",
-          "Your session has expired. Please log in again.",
-        );
+        Alert.alert("Session expired", "Please log in again.");
         return;
       }
 
@@ -310,434 +364,374 @@ export default function ProfileScreen() {
         .filter(Boolean)
         .join(" ");
 
-      const updates = {
-        first_name: profile.firstName.trim(),
-        middle_name: profile.middleName.trim() || null,
-        surname: profile.surname.trim(),
-        full_name: fullName,
-        phone_no: profile.phoneNo.trim(),
-        gender: profile.gender || null,
-        age: profile.age ? parseInt(profile.age, 10) : null,
-        county: profile.county.trim() || null,
-        relationship_status: profile.relationshipStatus || null,
-        religion: profile.religion.trim() || null,
-        emergency_phone: profile.emergencyPhone.trim() || null,
-        emergency_relationship: profile.emergencyRelationship.trim() || null,
-        updated_at: new Date().toISOString(),
-      };
-
       const { error } = await supabase
         .from("profiles")
-        .update(updates)
+        .update({
+          first_name: profile.firstName.trim(),
+          middle_name: profile.middleName.trim() || null,
+          surname: profile.surname.trim(),
+          full_name: fullName,
+          phone_no: profile.phoneNo.trim(),
+          gender: profile.gender || null,
+          age: profile.age ? parseInt(profile.age, 10) : null,
+          county: profile.county.trim() || null,
+          relationship_status: profile.relationshipStatus || null,
+          religion: profile.religion.trim() || null,
+          emergency_phone: profile.emergencyPhone.trim() || null,
+          emergency_relationship: profile.emergencyRelationship.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", user.id);
+      if (error) throw error;
 
-      if (error) {
-        console.error("Profile update error:", error);
-        throw error;
-      }
-
-      setProfile((prev) => ({
-        ...prev,
-        fullName,
-      }));
-
+      const next = { ...profile, fullName };
+      saved.current = next;
+      setProfile(next);
       setIsEditing(false);
-      Alert.alert("Success", "Profile updated successfully!");
+      buzz(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error("Save profile error:", error);
-      Alert.alert("Save Failed", error?.message || "Failed to update profile.");
+      buzz(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Couldn't save", error?.message || "Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleCancelEdit = () => {
-    fetchProfile();
+    setProfile(saved.current); // restore locally, no network call needed
     setIsEditing(false);
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.safeArea, styles.center]}>
-        <ActivityIndicator size="large" color="#16A34A" />
-      </SafeAreaView>
-    );
-  }
+  const handleNameChange = (text) => {
+    const parts = text.trim().split(/\s+/).filter(Boolean);
+    setProfile((prev) => ({
+      ...prev,
+      fullName: text,
+      firstName: parts[0] || "",
+      middleName: parts.length > 2 ? parts.slice(1, -1).join(" ") : "",
+      surname: parts.length > 1 ? parts[parts.length - 1] : "",
+    }));
+  };
+
+  // ---- Completion ----
+  const missing = TRACKED.filter(([key]) => !String(profile[key] || "").trim());
+  const percent = Math.round(
+    ((TRACKED.length - missing.length) / TRACKED.length) * 100,
+  );
+  const hint = missing.length ? `Add ${missing[0][1]} to keep going.` : "";
+
+  // ---- Sections ----
+  const cardWidth = { width: "100%" };
+
+  const account = (
+    <Section
+      key="account"
+      title="Account details"
+      icon="mail-outline"
+      index={0}
+      style={cardWidth}
+    >
+      <ProfileField
+        label="Email address"
+        value={profile.email}
+        editing={isEditing}
+        readOnlyHint="Email can't be changed here."
+      />
+      <ProfileField
+        label="Phone number"
+        value={profile.phoneNo}
+        editing={isEditing}
+        onChangeText={set("phoneNo")}
+        keyboardType="phone-pad"
+        placeholder="07XX XXX XXX"
+      />
+    </Section>
+  );
+
+  const personal = (
+    <Section
+      key="personal"
+      title="Personal details"
+      icon="person-outline"
+      index={1}
+      style={cardWidth}
+    >
+      <OptionChips
+        label="Gender"
+        options={GENDERS}
+        value={profile.gender}
+        editing={isEditing}
+        onChange={set("gender")}
+      />
+      <ProfileField
+        label="Age"
+        value={
+          isEditing ? profile.age : profile.age ? `${profile.age} years` : ""
+        }
+        editing={isEditing}
+        onChangeText={(t) => set("age")(t.replace(/[^0-9]/g, ""))}
+        keyboardType="number-pad"
+        maxLength={3}
+      />
+      <ProfileField
+        label="County"
+        value={profile.county}
+        editing={isEditing}
+        onChangeText={set("county")}
+        autoCapitalize="words"
+        placeholder="e.g. Kisumu"
+      />
+      <OptionChips
+        label="Relationship status"
+        options={RELATIONSHIPS}
+        value={profile.relationshipStatus}
+        editing={isEditing}
+        onChange={set("relationshipStatus")}
+      />
+      <ProfileField
+        label="Religion"
+        value={profile.religion}
+        editing={isEditing}
+        onChangeText={set("religion")}
+        autoCapitalize="words"
+      />
+    </Section>
+  );
+
+  const emergency = (
+    <Section
+      key="emergency"
+      title="Emergency contact"
+      icon="alert-circle-outline"
+      index={2}
+      style={cardWidth}
+    >
+      <ProfileField
+        label="Contact phone"
+        value={profile.emergencyPhone}
+        editing={isEditing}
+        onChangeText={set("emergencyPhone")}
+        keyboardType="phone-pad"
+        placeholder="07XX XXX XXX"
+      />
+      <ProfileField
+        label="Relationship to you"
+        value={profile.emergencyRelationship}
+        editing={isEditing}
+        onChangeText={set("emergencyRelationship")}
+        autoCapitalize="words"
+        placeholder="e.g. Parent"
+      />
+    </Section>
+  );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* Header with Layout Animations */}
-        <Animated.View
-          style={styles.header}
-          entering={FadeInDown.duration(400)}
-          layout={Layout.springify()}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={pui.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#16A34A"
+              colors={["#16A34A"]}
+            />
+          }
         >
-          <Text style={styles.headerTitle}>My Profile</Text>
+          <View style={pui.content}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>My profile</Text>
 
-          {!isEditing ? (
-            <AnimatedTouchableOpacity
-              entering={FadeIn.duration(200)}
-              exiting={FadeOut.duration(200)}
-              style={styles.editHeaderBtn}
-              onPress={() => setIsEditing(true)}
-              disabled={saving}
-            >
-              <Ionicons name="create-outline" size={18} color="#16A34A" />
-              <Text style={styles.editHeaderBtnText}>Edit</Text>
-            </AnimatedTouchableOpacity>
-          ) : (
-            <Animated.View
-              entering={FadeIn.duration(200)}
-              exiting={FadeOut.duration(200)}
-              style={{ flexDirection: "row", gap: 10 }}
-            >
-              <TouchableOpacity
-                style={styles.cancelHeaderBtn}
-                onPress={handleCancelEdit}
-                disabled={saving}
-              >
-                <Text style={styles.cancelHeaderBtnText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.editHeaderBtn}
-                onPress={handleSaveProfile}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#16A34A" />
+              {!loading &&
+                (isEditing ? (
+                  <Animated.View
+                    key="editing"
+                    entering={FadeIn.duration(180)}
+                    exiting={FadeOut.duration(120)}
+                    style={pui.headerActions}
+                  >
+                    <PressableScale
+                      style={styles.cancelHeaderBtn}
+                      onPress={handleCancelEdit}
+                      disabled={saving}
+                    >
+                      <Text style={styles.cancelHeaderBtnText}>Cancel</Text>
+                    </PressableScale>
+                    <PressableScale
+                      haptic
+                      style={styles.editHeaderBtn}
+                      onPress={handleSaveProfile}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <ActivityIndicator size="small" color="#16A34A" />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="checkmark-sharp"
+                            size={18}
+                            color="#16A34A"
+                          />
+                          <Text style={styles.editHeaderBtnText}>Save</Text>
+                        </>
+                      )}
+                    </PressableScale>
+                  </Animated.View>
                 ) : (
-                  <>
-                    <Ionicons
-                      name="checkmark-sharp"
-                      size={18}
-                      color="#16A34A"
-                    />
-                    <Text style={styles.editHeaderBtnText}>Save</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </Animated.View>
+                  <Animated.View
+                    key="viewing"
+                    entering={FadeIn.duration(180)}
+                    exiting={FadeOut.duration(120)}
+                  >
+                    <PressableScale
+                      haptic
+                      style={styles.editHeaderBtn}
+                      onPress={() => setIsEditing(true)}
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={18}
+                        color="#16A34A"
+                      />
+                      <Text style={styles.editHeaderBtnText}>Edit</Text>
+                    </PressableScale>
+                  </Animated.View>
+                ))}
+            </View>
 
-        {/* Profile Avatar Card */}
-        <Animated.View
-          style={styles.avatarContainer}
-          entering={FadeInDown.delay(100).duration(500)}
-          layout={Layout.springify()}
-        >
-          <Animated.View style={[styles.avatarWrapper, avatarAnimatedStyle]}>
-            {profile.profileImageUri && !imageError ? (
-              <Image
-                source={{
-                  uri: profile.profileImageUri,
-                }}
-                style={styles.avatarImage}
-                onError={() => setImageError(true)}
+            {loading ? (
+              <ProfileSkeleton
+                columns={columns}
+                itemWidth={columns === 2 ? "48.5%" : "100%"}
               />
             ) : (
-              <View style={styles.avatarFallback}>
-                <Text style={styles.avatarInitialsText}>
-                  {getInitials(profile.firstName, profile.surname)}
-                </Text>
-              </View>
+              <>
+                {/* Avatar */}
+                <Animated.View
+                  entering={FadeIn.duration(400)}
+                  style={styles.avatarContainer}
+                >
+                  <View style={styles.avatarWrapper}>
+                    {profile.profileImageUri && !imageError ? (
+                      <Image
+                        source={{ uri: profile.profileImageUri }}
+                        style={styles.avatarImage}
+                        onError={() => setImageError(true)}
+                      />
+                    ) : (
+                      <View style={styles.avatarFallback}>
+                        <Text style={styles.avatarInitialsText}>
+                          {getInitials()}
+                        </Text>
+                      </View>
+                    )}
+
+                    {uploading && (
+                      <Animated.View
+                        entering={FadeIn}
+                        exiting={FadeOut}
+                        style={pui.avatarBusy}
+                      >
+                        <ActivityIndicator color="#FFFFFF" />
+                      </Animated.View>
+                    )}
+
+                    <PressableScale
+                      scaleTo={0.88}
+                      haptic
+                      containerStyle={styles.addPhotoButton}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      onPress={handlePickImage}
+                      disabled={uploading || saving}
+                      accessibilityLabel="Change profile photo"
+                    >
+                      <Ionicons name="camera" size={16} color="#FFFFFF" />
+                    </PressableScale>
+                  </View>
+
+                  {isEditing ? (
+                    <Animated.View
+                      entering={FadeIn.duration(220)}
+                      style={{ width: "100%", alignItems: "center" }}
+                    >
+                      <TextInput
+                        style={styles.inputName}
+                        value={profile.fullName}
+                        onChangeText={handleNameChange}
+                        placeholder="Full name"
+                        placeholderTextColor="#94A3B8"
+                        autoCapitalize="words"
+                        selectionColor="#16A34A"
+                      />
+                    </Animated.View>
+                  ) : (
+                    <Animated.Text
+                      entering={FadeIn.duration(220)}
+                      style={styles.userName}
+                    >
+                      {profile.fullName || "Client"}
+                    </Animated.Text>
+                  )}
+                  <Text style={styles.userRole}>Youth client</Text>
+                </Animated.View>
+
+                <Completion percent={percent} hint={hint} />
+
+                {columns === 2 ? (
+                  <View style={pui.columns}>
+                    <View style={[pui.column, { gap: GAP }]}>
+                      {account}
+                      {emergency}
+                    </View>
+                    <View style={pui.column}>{personal}</View>
+                  </View>
+                ) : (
+                  <View style={{ gap: GAP }}>
+                    {account}
+                    {personal}
+                    {emergency}
+                  </View>
+                )}
+
+                {isEditing && (
+                  <Animated.View
+                    entering={FadeInDown.duration(300)}
+                    exiting={FadeOut.duration(150)}
+                    layout={LinearTransition}
+                    style={{ marginTop: GAP }}
+                  >
+                    <PressableScale
+                      haptic
+                      style={[styles.saveButton, { marginBottom: 0 }]}
+                      onPress={handleSaveProfile}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.saveButtonText}>Save changes</Text>
+                      )}
+                    </PressableScale>
+                  </Animated.View>
+                )}
+              </>
             )}
-
-            <TouchableOpacity
-              style={styles.addPhotoButton}
-              onPressIn={() => (avatarScale.value = withSpring(0.9))}
-              onPressOut={() => (avatarScale.value = withSpring(1))}
-              onPress={handlePickImage}
-              activeOpacity={0.8}
-              disabled={saving}
-            >
-              <Ionicons name="camera" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
-          </Animated.View>
-
-          {isEditing ? (
-            <Animated.View
-              entering={FadeIn.duration(250)}
-              exiting={FadeOut.duration(200)}
-              style={{ width: "100%" }}
-            >
-              <TextInput
-                style={styles.inputName}
-                value={profile.fullName}
-                onChangeText={(text) => {
-                  const parts = text.trim().split(/\s+/);
-                  const firstName = parts[0] || "";
-                  const surname =
-                    parts.length > 1 ? parts[parts.length - 1] : "";
-                  const middleName =
-                    parts.length > 2 ? parts.slice(1, -1).join(" ") : "";
-
-                  setProfile((prev) => ({
-                    ...prev,
-                    fullName: text,
-                    firstName,
-                    middleName,
-                    surname,
-                  }));
-                }}
-                placeholder="Full Name"
-                placeholderTextColor="#94A3B8"
-              />
-            </Animated.View>
-          ) : (
-            <Animated.Text
-              entering={FadeIn.duration(250)}
-              style={styles.userName}
-            >
-              {profile.fullName || "Client"}
-            </Animated.Text>
-          )}
-
-          <Text style={styles.userRole}>Youth Client</Text>
-        </Animated.View>
-
-        {/* Section 1: Account Details */}
-        <Animated.View
-          style={styles.sectionCard}
-          entering={FadeInDown.delay(200).duration(500)}
-          layout={Layout.springify()}
-        >
-          <Text style={styles.sectionTitle}>Account Details</Text>
-
-          <View style={styles.fieldRow}>
-            <View style={styles.fieldInfo}>
-              <Text style={styles.fieldLabel}>Email Address</Text>
-              <Text style={styles.fieldValue}>
-                {profile.email || "Not provided"}
-              </Text>
-            </View>
           </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.fieldRow}>
-            <View style={styles.fieldInfo}>
-              <Text style={styles.fieldLabel}>Phone Number</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inputField}
-                  value={profile.phoneNo}
-                  onChangeText={(text) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      phoneNo: text,
-                    }))
-                  }
-                  keyboardType="phone-pad"
-                />
-              ) : (
-                <Text style={styles.fieldValue}>
-                  {profile.phoneNo || "Not provided"}
-                </Text>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-
-        {/* Section 2: Personal Details */}
-        <Animated.View
-          style={styles.sectionCard}
-          entering={FadeInDown.delay(300).duration(500)}
-          layout={Layout.springify()}
-        >
-          <Text style={styles.sectionTitle}>Personal Details</Text>
-
-          <View style={styles.gridRow}>
-            <View style={styles.gridItem}>
-              <Text style={styles.fieldLabel}>Gender</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inputField}
-                  value={profile.gender}
-                  onChangeText={(text) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      gender: text,
-                    }))
-                  }
-                />
-              ) : (
-                <Text style={styles.fieldValue}>
-                  {profile.gender || "Not provided"}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.gridItem}>
-              <Text style={styles.fieldLabel}>Age</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inputField}
-                  value={profile.age}
-                  onChangeText={(text) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      age: text,
-                    }))
-                  }
-                  keyboardType="numeric"
-                />
-              ) : (
-                <Text style={styles.fieldValue}>
-                  {profile.age ? `${profile.age} years` : "Not provided"}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.gridRow}>
-            <View style={styles.gridItem}>
-              <Text style={styles.fieldLabel}>County</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inputField}
-                  value={profile.county}
-                  onChangeText={(text) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      county: text,
-                    }))
-                  }
-                />
-              ) : (
-                <Text style={styles.fieldValue}>
-                  {profile.county || "Not provided"}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.gridItem}>
-              <Text style={styles.fieldLabel}>Relationship Status</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inputField}
-                  value={profile.relationshipStatus}
-                  onChangeText={(text) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      relationshipStatus: text,
-                    }))
-                  }
-                />
-              ) : (
-                <Text style={styles.fieldValue}>
-                  {profile.relationshipStatus || "Not provided"}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.gridRow}>
-            <View style={styles.gridItem}>
-              <Text style={styles.fieldLabel}>Religion</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inputField}
-                  value={profile.religion}
-                  onChangeText={(text) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      religion: text,
-                    }))
-                  }
-                />
-              ) : (
-                <Text style={styles.fieldValue}>
-                  {profile.religion || "Not provided"}
-                </Text>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-
-        {/* Section 3: Emergency Contact */}
-        <Animated.View
-          style={styles.sectionCard}
-          entering={FadeInDown.delay(400).duration(500)}
-          layout={Layout.springify()}
-        >
-          <Text style={styles.sectionTitle}>Emergency Contact</Text>
-
-          <View style={styles.gridRow}>
-            <View style={styles.gridItem}>
-              <Text style={styles.fieldLabel}>Contact Phone</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inputField}
-                  value={profile.emergencyPhone}
-                  onChangeText={(text) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      emergencyPhone: text,
-                    }))
-                  }
-                  keyboardType="phone-pad"
-                />
-              ) : (
-                <Text style={styles.fieldValue}>
-                  {profile.emergencyPhone || "Not provided"}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.gridItem}>
-              <Text style={styles.fieldLabel}>Relationship</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.inputField}
-                  value={profile.emergencyRelationship}
-                  onChangeText={(text) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      emergencyRelationship: text,
-                    }))
-                  }
-                />
-              ) : (
-                <Text style={styles.fieldValue}>
-                  {profile.emergencyRelationship || "Not provided"}
-                </Text>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-
-        {/* Animated Save Button */}
-        {isEditing && (
-          <Animated.View
-            entering={FadeInDown.duration(300)}
-            exiting={FadeOut.duration(200)}
-            layout={Layout.springify()}
-          >
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleSaveProfile}
-              disabled={saving}
-              activeOpacity={0.8}
-            >
-              {saving ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveButtonText}>Save Changes</Text>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
