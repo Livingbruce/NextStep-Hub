@@ -1,47 +1,47 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
-  FlatList,
-  Image,
-  LayoutAnimation,
-  Linking,
-  Platform,
   RefreshControl,
+  ScrollView,
   Text,
-  TextInput,
-  TouchableOpacity,
-  UIManager,
+  useWindowDimensions,
   View,
 } from "react-native";
+import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../libs/supabase";
+import AnimatedTabs from "../../components/client/appointments/AnimatedTabs";
+import AppointmentCard, {
+  isHistoryAppointment,
+} from "../../components/client/appointments/AppointmentCard";
+import AppointmentSkeletonList from "../../components/client/appointments/AppointmentSkeleton";
+import PressableScale from "../../components/client/appointments/PressableScale";
 import { styles } from "../../styles/(client)/appointments/index";
+import { ui } from "../../styles/(client)/appointments/ui";
 
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental &&
-  !global.nativeFabricUIManager
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+const GAP = 16;
+const MAX_CONTENT = 1100;
+const H_PADDING = 20;
 
 export default function AppointmentScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-
-  // Active Tab: 'upcoming' or 'history'
   const [activeTab, setActiveTab] = useState("upcoming");
-
   const [expandedId, setExpandedId] = useState(null);
-  const [cancelReason, setCancelReason] = useState("");
-  const [reviewText, setReviewText] = useState("");
+  const hasLoaded = useRef(false);
+
+  // ---- Responsive grid: 1 column on phones, 2 on tablets / landscape ----
+  const columns = width >= 720 ? 2 : 1;
+  const contentWidth = Math.min(width, MAX_CONTENT) - H_PADDING * 2;
+  const itemWidth = columns === 1 ? "100%" : (contentWidth - GAP) / columns;
 
   useFocusEffect(
     useCallback(() => {
@@ -51,7 +51,8 @@ export default function AppointmentScreen() {
 
   const fetchAppointments = async () => {
     try {
-      setLoading(true);
+      // Only show the skeleton on the very first load; later focuses refresh quietly.
+      if (!hasLoaded.current) setLoading(true);
 
       const {
         data: { user },
@@ -60,8 +61,8 @@ export default function AppointmentScreen() {
 
       if (userError || !user) {
         Alert.alert(
-          "Authentication Required",
-          "Please sign in to view appointments.",
+          "Sign in required",
+          "Please sign in to view your appointments.",
         );
         return;
       }
@@ -103,11 +104,11 @@ export default function AppointmentScreen() {
         .order("scheduled_start_time", { ascending: true });
 
       if (error) throw error;
-
       setAppointments(data || []);
+      hasLoaded.current = true;
     } catch (err) {
       console.error("Error fetching appointments:", err);
-      Alert.alert("Error", "Could not retrieve your appointments.");
+      Alert.alert("Couldn't load appointments", "Pull down to try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -119,107 +120,90 @@ export default function AppointmentScreen() {
     fetchAppointments();
   }, []);
 
-  const toggleExpand = (id) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedId((prev) => (prev === id ? null : id));
-    setCancelReason("");
-    setReviewText("");
-  };
+  const buzz = (type) => Haptics.notificationAsync(type).catch(() => {});
 
-  const handleCancelAppointment = async (id) => {
-    if (!cancelReason.trim()) {
+  // ---- Actions ----
+  const handleCancel = async (id, reason) => {
+    if (!reason.trim()) {
       return Alert.alert(
-        "Required",
-        "Please provide a reason for cancellation.",
+        "Reason needed",
+        "Please tell us why you are cancelling.",
       );
     }
-
     try {
       setActionLoading(true);
-
       const { error } = await supabase
         .from("appointments")
         .update({
           status: "cancelled_by_client",
-          action_reason: cancelReason.trim(),
+          action_reason: reason.trim(),
           action_by_role: "client",
           action_at: new Date().toISOString(),
         })
         .eq("id", id);
-
       if (error) throw error;
 
-      Alert.alert("Cancelled", "Your appointment has been cancelled.");
-      setCancelReason("");
+      buzz(Haptics.NotificationFeedbackType.Success);
       setExpandedId(null);
-      fetchAppointments();
+      await fetchAppointments();
     } catch (err) {
       console.error("Error cancelling appointment:", err);
-      Alert.alert("Error", err.message || "Failed to cancel appointment.");
+      buzz(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Couldn't cancel", err.message || "Please try again.");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleSaveReview = async (id) => {
-    if (!reviewText.trim()) {
+  const handleReview = async (id, text) => {
+    if (!text.trim()) {
       return Alert.alert(
-        "Required",
-        "Please enter a review before submitting.",
+        "Review needed",
+        "Write a few words before submitting.",
       );
     }
-
     try {
       setActionLoading(true);
-
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("You're not signed in.");
 
-      if (userError || !user) throw new Error("User not authenticated");
-
-      const payload = {
-        appointment_id: id,
-        reviewer_id: user.id,
-        reviewer_role: "client",
-        feedback_text: reviewText.trim(),
-      };
-
-      const { error } = await supabase
-        .from("appointment_reviews")
-        .insert([payload]);
+      const { error } = await supabase.from("appointment_reviews").insert([
+        {
+          appointment_id: id,
+          reviewer_id: user.id,
+          reviewer_role: "client",
+          feedback_text: text.trim(),
+        },
+      ]);
 
       if (error) {
         if (error.code === "23505") {
-          throw new Error(
-            "You have already submitted a review for this session.",
-          );
+          throw new Error("You've already reviewed this session.");
         }
         throw error;
       }
 
-      Alert.alert("Thank You", "Your review has been submitted successfully.");
-      setReviewText("");
+      buzz(Haptics.NotificationFeedbackType.Success);
       setExpandedId(null);
-      fetchAppointments();
+      await fetchAppointments();
     } catch (err) {
       console.error("Error submitting review:", err);
-      Alert.alert(
-        "Submission Error",
-        err.message || "Failed to submit review.",
-      );
+      buzz(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Couldn't submit review", err.message || "Please try again.");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleDeleteAppointment = (id) => {
+  const handleDelete = (id) => {
     Alert.alert(
-      "Delete Record",
-      "Are you sure you want to remove this record from your screen?",
+      "Delete this record?",
+      "It will be removed from your appointments.",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "Keep", style: "cancel" },
         {
           text: "Delete",
           style: "destructive",
@@ -230,14 +214,14 @@ export default function AppointmentScreen() {
                 .from("appointments")
                 .delete()
                 .eq("id", id);
-
               if (error) throw error;
 
-              setAppointments((prev) => prev.filter((app) => app.id !== id));
+              // Removing it from state plays the card's exit + reflow animation.
+              setAppointments((prev) => prev.filter((a) => a.id !== id));
               setExpandedId(null);
             } catch (err) {
               console.error("Error deleting appointment:", err);
-              Alert.alert("Error", "Could not delete appointment record.");
+              Alert.alert("Couldn't delete", "Please try again.");
             } finally {
               setActionLoading(false);
             }
@@ -247,451 +231,148 @@ export default function AppointmentScreen() {
     );
   };
 
-  const openSessionLink = async (url) => {
-    try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert("Invalid Link", "Cannot open session link.");
-      }
-    } catch (err) {
-      console.error("Error launching URL:", err);
-    }
-  };
-
-  const formatStatus = (status, paymentStatus) => {
-    switch (status) {
-      case "completed":
-        return { label: "Done", bg: "#E0F2FE", text: "#0369A1" };
-      case "cancelled_by_client":
-      case "cancelled_by_counselor":
-      case "cancelled":
-        return { label: "Cancelled", bg: "#FEE2E2", text: "#DC2626" };
-      case "not_attended":
-      case "missed":
-      case "no_show":
-        return { label: "Not Attended", bg: "#FEF3C7", text: "#B45309" };
-      case "scheduled":
-        return { label: "Confirmed", bg: "#DCFCE7", text: "#15803D" };
-      case "pending_payment":
-        return paymentStatus === "completed"
-          ? { label: "Confirmed", bg: "#DCFCE7", text: "#15803D" }
-          : { label: "Pending Payment", bg: "#FEF3C7", text: "#B45309" };
-      default:
-        return {
-          label: status.replace(/_/g, " "),
-          bg: "#F1F5F9",
-          text: "#475569",
-        };
-    }
-  };
-
-  const formatDateTime = (isoString) => {
-    if (!isoString) return { dateStr: "N/A", timeStr: "N/A" };
-    const dateObj = new Date(isoString);
-    const dateStr = dateObj.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    const timeStr = dateObj.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    return { dateStr, timeStr };
-  };
-
-  const getInitials = (firstName = "", surname = "") => {
-    const f = firstName.trim().charAt(0);
-    const s = surname.trim().charAt(0);
-    return `${f}${s}`.toUpperCase() || "C";
-  };
-
-  // Helper check for historical status
-  const isHistoryAppointment = (app) => {
-    const historyStatuses = [
-      "completed",
-      "cancelled_by_client",
-      "cancelled_by_counselor",
-      "cancelled",
-      "not_attended",
-      "missed",
-      "no_show",
-    ];
-    return historyStatuses.includes(app.status);
-  };
-
-  // Filter lists based on tab selection
-  const upcomingAppointments = appointments.filter(
-    (app) => !isHistoryAppointment(app),
+  // ---- Derived lists ----
+  const upcoming = useMemo(
+    () => appointments.filter((a) => !isHistoryAppointment(a)),
+    [appointments],
   );
-  const historyAppointments = appointments.filter((app) =>
-    isHistoryAppointment(app),
+  const history = useMemo(
+    () =>
+      appointments
+        .filter(isHistoryAppointment)
+        .sort(
+          (a, b) =>
+            new Date(b.scheduled_start_time) - new Date(a.scheduled_start_time),
+        ),
+    [appointments],
   );
 
-  const displayedAppointments =
-    activeTab === "upcoming" ? upcomingAppointments : historyAppointments;
+  const displayed = activeTab === "upcoming" ? upcoming : history;
 
-  const renderAppointmentCard = ({ item }) => {
-    const isExpanded = expandedId === item.id;
-    const statusMeta = formatStatus(item.status, item.payment_status);
-    const { dateStr, timeStr } = formatDateTime(item.scheduled_start_time);
+  const tabs = [
+    { key: "upcoming", label: "Upcoming", count: upcoming.length },
+    { key: "history", label: "History", count: history.length },
+  ];
 
-    const isDone = item.status === "completed";
-    const isCancelled =
-      item.status === "cancelled_by_client" ||
-      item.status === "cancelled_by_counselor" ||
-      item.status === "cancelled";
-    const isNotAttended =
-      item.status === "not_attended" ||
-      item.status === "missed" ||
-      item.status === "no_show";
+  const goToBooking = () => router.push("/appointments/newAppointments");
 
-    const counselorFirstName = item.counselor?.first_name || "";
-    const counselorSurname = item.counselor?.surname || "";
-    const counselorName = item.counselor
-      ? `Counselor ${counselorFirstName} ${counselorSurname}`.trim()
-      : "Unassigned Counselor";
-
-    const avatarUrl = item.counselor?.avatar_url;
-    const initials = getInitials(counselorFirstName, counselorSurname);
-
-    const counselorReview = item.reviews?.find(
-      (r) => r.reviewer_role === "counselor",
-    );
-    const clientReview = item.reviews?.find(
-      (r) => r.reviewer_role === "client",
-    );
-
-    return (
-      <View style={styles.card}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => toggleExpand(item.id)}
-        >
-          <View style={styles.cardHeader}>
-            <View style={styles.counselorInfo}>
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatarFallback}>
-                  <Text style={styles.avatarText}>{initials}</Text>
-                </View>
-              )}
-              <View style={styles.counselorTextWrapper}>
-                <Text style={styles.counselorName} numberOfLines={1}>
-                  {counselorName}
-                </Text>
-                <Text style={styles.typeText}>
-                  {item.counseling_type} Session
-                </Text>
-              </View>
-            </View>
-            <View
-              style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}
-            >
-              <Text style={[styles.statusText, { color: statusMeta.text }]}>
-                {statusMeta.label}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.cardFooter}>
-            <View style={styles.metaRow}>
-              <Ionicons name="calendar-outline" size={16} color="#64748B" />
-              <Text style={styles.metaText}>{dateStr}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Ionicons name="time-outline" size={16} color="#64748B" />
-              <Text style={styles.metaText}>{timeStr}</Text>
-            </View>
-            <Ionicons
-              name={isExpanded ? "chevron-up" : "chevron-down"}
-              size={18}
-              color="#94A3B8"
-              style={{ marginLeft: "auto" }}
-            />
-          </View>
-        </TouchableOpacity>
-
-        {/* EXPANDED SECTION */}
-        {isExpanded && (
-          <View style={styles.expandedContent}>
-            {/* Session Link */}
-            {item.session_link && !isCancelled && !isNotAttended && (
-              <View style={styles.detailBlock}>
-                <Text style={styles.detailTitle}>Session Meeting Link:</Text>
-                <TouchableOpacity
-                  onPress={() => openSessionLink(item.session_link)}
-                >
-                  <Text style={styles.linkText} numberOfLines={1}>
-                    {item.session_link}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Booking Intake Details */}
-            {item.reasons && item.reasons.length > 0 && (
-              <View style={styles.detailBlock}>
-                <Text style={styles.detailTitle}>Reasons for Session:</Text>
-                <Text style={styles.detailText}>
-                  {item.reasons.join(", ")}
-                  {item.other_reason ? ` (${item.other_reason})` : ""}
-                </Text>
-              </View>
-            )}
-
-            {item.session_goals && (
-              <View style={styles.detailBlock}>
-                <Text style={styles.detailTitle}>Session Goals:</Text>
-                <Text style={styles.detailText}>{item.session_goals}</Text>
-              </View>
-            )}
-
-            <View style={styles.detailBlock}>
-              <Text style={styles.detailTitle}>Prior Therapy Experience:</Text>
-              <Text style={styles.detailText}>
-                {item.had_therapy_before ? "Yes" : "No"}
-              </Text>
-            </View>
-
-            {item.notes && (
-              <View style={styles.detailBlock}>
-                <Text style={styles.detailTitle}>Counselor Session Notes:</Text>
-                <Text style={styles.detailText}>{item.notes}</Text>
-              </View>
-            )}
-
-            {counselorReview?.counselor_notes && (
-              <View style={styles.detailBlock}>
-                <Text style={styles.detailTitle}>Counselor Review Notes:</Text>
-                <Text style={styles.detailText}>
-                  {counselorReview.counselor_notes}
-                </Text>
-              </View>
-            )}
-
-            {clientReview?.feedback_text && (
-              <View style={styles.detailBlock}>
-                <Text style={styles.detailTitle}>Your Feedback:</Text>
-                <Text style={styles.detailText}>
-                  {clientReview.feedback_text}
-                </Text>
-              </View>
-            )}
-
-            {/* Action Buttons & Feedback Form */}
-            {isDone ? (
-              <View style={{ marginTop: 8 }}>
-                {!clientReview && (
-                  <>
-                    <Text style={styles.actionLabel}>Leave a Review</Text>
-                    <TextInput
-                      style={styles.actionInput}
-                      placeholder="Share feedback on your session..."
-                      placeholderTextColor="#94A3B8"
-                      value={reviewText}
-                      onChangeText={setReviewText}
-                      multiline
-                    />
-                  </>
-                )}
-                <View style={styles.actionButtonRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.deleteBtn]}
-                    onPress={() => handleDeleteAppointment(item.id)}
-                    disabled={actionLoading}
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                    <Text style={styles.deleteBtnText}>Delete</Text>
-                  </TouchableOpacity>
-
-                  {!clientReview && (
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.submitBtn]}
-                      onPress={() => handleSaveReview(item.id)}
-                      disabled={actionLoading}
-                    >
-                      {actionLoading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Text style={styles.submitBtnText}>Submit Review</Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            ) : isCancelled ? (
-              <View style={{ marginTop: 8 }}>
-                <Text style={styles.cancelledNotice}>
-                  This appointment was cancelled.
-                  {item.action_reason
-                    ? `\nReason: "${item.action_reason}"`
-                    : ""}
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.actionBtn,
-                    styles.deleteBtn,
-                    { marginTop: 10 },
-                  ]}
-                  onPress={() => handleDeleteAppointment(item.id)}
-                  disabled={actionLoading}
-                >
-                  <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                  <Text style={styles.deleteBtnText}>Delete Record</Text>
-                </TouchableOpacity>
-              </View>
-            ) : isNotAttended ? (
-              <View style={{ marginTop: 8 }}>
-                <Text style={styles.cancelledNotice}>
-                  This session was marked as not attended / missed.
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.actionBtn,
-                    styles.deleteBtn,
-                    { marginTop: 10 },
-                  ]}
-                  onPress={() => handleDeleteAppointment(item.id)}
-                  disabled={actionLoading}
-                >
-                  <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                  <Text style={styles.deleteBtnText}>Delete Record</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={{ marginTop: 8 }}>
-                <Text style={styles.actionLabel}>Reason for Cancellation</Text>
-                <TextInput
-                  style={styles.actionInput}
-                  placeholder="Tell us why you are cancelling..."
-                  placeholderTextColor="#94A3B8"
-                  value={cancelReason}
-                  onChangeText={setCancelReason}
-                  multiline
-                />
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.cancelBtn]}
-                  onPress={() => handleCancelAppointment(item.id)}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.cancelBtnText}>
-                      Confirm Cancellation
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-      </View>
-    );
+  const changeTab = (key) => {
+    setExpandedId(null);
+    setActiveTab(key);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.maxContainer}>
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Your Appointments</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            activeOpacity={0.7}
-            onPress={() => router.push("/appointments/newAppointments")}
-          >
-            <Ionicons name="add" size={24} color="#0F172A" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Navigation Tabs */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === "upcoming" && styles.activeTabButton,
-            ]}
-            onPress={() => setActiveTab("upcoming")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "upcoming" && styles.activeTabText,
-              ]}
-            >
-              Upcoming ({upcomingAppointments.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === "history" && styles.activeTabButton,
-            ]}
-            onPress={() => setActiveTab("history")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "history" && styles.activeTabText,
-              ]}
-            >
-              History ({historyAppointments.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#936D9A"
-            style={{ marginTop: 40 }}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={ui.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#936D9A"
+            colors={["#936D9A"]}
           />
-        ) : displayedAppointments.length > 0 ? (
-          <FlatList
-            data={displayedAppointments}
-            keyExtractor={(item) => item.id}
-            renderItem={renderAppointmentCard}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-          />
-        ) : (
-          <View style={styles.sectionContainer}>
-            <Ionicons
-              name={
-                activeTab === "upcoming" ? "calendar-outline" : "time-outline"
-              }
-              size={64}
-              color="#CBD5E1"
-            />
-            <Text style={styles.emptySubtitle}>
-              {activeTab === "upcoming"
-                ? "You have no upcoming appointments scheduled."
-                : "No past or historical appointments found."}
-            </Text>
-            {activeTab === "upcoming" && (
-              <TouchableOpacity
-                style={styles.bookButton}
-                activeOpacity={0.8}
-                onPress={() => router.push("/appointments/newAppointments")}
-              >
-                <Text style={styles.bookButtonText}>Book Appointment</Text>
-              </TouchableOpacity>
-            )}
+        }
+      >
+        <View style={ui.content}>
+          {/* Header */}
+          <View style={ui.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={ui.title}>Your appointments</Text>
+              {!loading && (
+                <Animated.Text
+                  entering={FadeIn.duration(300)}
+                  style={ui.subtitle}
+                >
+                  {upcoming.length === 0
+                    ? "Nothing scheduled right now"
+                    : `${upcoming.length} upcoming ${
+                        upcoming.length === 1 ? "session" : "sessions"
+                      }`}
+                </Animated.Text>
+              )}
+            </View>
+
+            <PressableScale
+              haptic
+              style={ui.newBtn}
+              onPress={goToBooking}
+              accessibilityLabel="Book a new appointment"
+            >
+              <Ionicons name="add" size={18} color="#FFFFFF" />
+              <Text style={ui.newBtnText}>Book</Text>
+            </PressableScale>
           </View>
-        )}
-      </View>
+
+          <AnimatedTabs tabs={tabs} active={activeTab} onChange={changeTab} />
+
+          {/* Body */}
+          {loading ? (
+            <AppointmentSkeletonList
+              count={columns * 3}
+              itemWidth={itemWidth}
+              gap={GAP}
+            />
+          ) : displayed.length > 0 ? (
+            <View key={activeTab} style={[ui.grid, { gap: GAP }]}>
+              {displayed.map((item, index) => (
+                <AppointmentCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  style={{ width: itemWidth }}
+                  expanded={expandedId === item.id}
+                  onToggle={() =>
+                    setExpandedId((prev) => (prev === item.id ? null : item.id))
+                  }
+                  onCancel={handleCancel}
+                  onReview={handleReview}
+                  onDelete={handleDelete}
+                  busy={actionLoading && expandedId === item.id}
+                />
+              ))}
+            </View>
+          ) : (
+            <View key={activeTab} style={ui.empty}>
+              <Animated.View
+                entering={ZoomIn.duration(400).springify().damping(12)}
+                style={ui.emptyCircle}
+              >
+                <Ionicons
+                  name={
+                    activeTab === "upcoming"
+                      ? "calendar-outline"
+                      : "time-outline"
+                  }
+                  size={44}
+                  color="#936D9A"
+                />
+              </Animated.View>
+              <Animated.Text entering={FadeIn.delay(150)} style={ui.emptyTitle}>
+                {activeTab === "upcoming"
+                  ? "No upcoming sessions"
+                  : "No past sessions yet"}
+              </Animated.Text>
+              <Animated.Text entering={FadeIn.delay(220)} style={ui.emptyText}>
+                {activeTab === "upcoming"
+                  ? "Book a session with a counselor to take your next step."
+                  : "Completed and cancelled sessions will show up here."}
+              </Animated.Text>
+              {activeTab === "upcoming" && (
+                <PressableScale
+                  haptic
+                  style={styles.bookButton}
+                  onPress={goToBooking}
+                >
+                  <Text style={styles.bookButtonText}>Book appointment</Text>
+                </PressableScale>
+              )}
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
