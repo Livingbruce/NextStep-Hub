@@ -77,30 +77,32 @@ export default function CounselorDashboard() {
         setCounselorFirstName("Counselor");
       }
 
-      // 2. Fetch upcoming / scheduled appointments for this counselor
       const { data: appointmentsData, error: appointmentsError } =
         await supabase
           .from("appointments")
           .select(
             `
+          id,
+          counseling_type,
+          duration_minutes,
+          session_mode,
+          client_call_phone,
+          reasons,
+          other_reason,
+          session_goals,
+          notes,
+          session_link,
+          scheduled_start_time,
+          scheduled_end_time,
+          status,
+          client:client_id (
             id,
-            counseling_type,
-            reasons,
-            other_reason,
-            session_goals,
-            notes,
-            session_link,
-            scheduled_start_time,
-            scheduled_end_time,
-            status,
-            client:client_id (
-              id,
-              first_name,
-              surname,
-              phone_no,
-              county
-            )
-          `,
+            first_name,
+            surname,
+            phone_no,
+            county
+          )
+        `,
           )
           .eq("counselor_id", currentUser.id)
           .in("status", ["scheduled", "rescheduled", "pending_payment"])
@@ -188,6 +190,20 @@ export default function CounselorDashboard() {
     });
   };
 
+  const handleMakePhoneCall = (phoneNumber) => {
+    if (!phoneNumber) {
+      Alert.alert(
+        "No Phone Number",
+        "No contact phone number available for this client.",
+      );
+      return;
+    }
+    const cleanNumber = phoneNumber.replace(/[^0-9+]/g, "");
+    Linking.openURL(`tel:${cleanNumber}`).catch(() => {
+      Alert.alert("Error", "Could not open phone dialer app.");
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header Bar */}
@@ -235,17 +251,56 @@ export default function CounselorDashboard() {
                 const clientName = session.client
                   ? `${session.client.first_name || ""} ${session.client.surname || ""}`.trim()
                   : "Client";
-                const phone = session.client?.phone_no || "N/A";
+                const displayedPhone =
+                  session.session_mode === "phone"
+                    ? session.client_call_phone ||
+                      session.client?.phone_no ||
+                      "N/A"
+                    : session.client?.phone_no || "N/A";
                 const county = session.client?.county || "Unspecified";
 
                 return (
                   <View key={session.id} style={styles.sessionCard}>
+                    {/* Card Header with Badges & Time */}
                     <View style={styles.cardHeader}>
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>
-                          {session.counseling_type}
-                        </Text>
+                      <View style={styles.badgeContainer}>
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeText}>
+                            {session.counseling_type}
+                          </Text>
+                        </View>
+
+                        {/* Duration Badge */}
+                        <View style={styles.durationBadge}>
+                          <Ionicons
+                            name="time-outline"
+                            size={12}
+                            color="#047857"
+                          />
+                          <Text style={styles.durationBadgeText}>
+                            {session.duration_minutes || 50} mins
+                          </Text>
+                        </View>
+
+                        {/* Session Mode Badge */}
+                        {session.session_mode && (
+                          <View style={styles.modeBadge}>
+                            <Ionicons
+                              name={
+                                session.session_mode === "phone"
+                                  ? "call-outline"
+                                  : "videocam-outline"
+                              }
+                              size={12}
+                              color="#6B21A8"
+                            />
+                            <Text style={styles.modeBadgeText}>
+                              {session.session_mode.toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
                       </View>
+
                       <Text style={styles.timeText}>
                         {formatDateTime(session.scheduled_start_time)}
                       </Text>
@@ -253,25 +308,49 @@ export default function CounselorDashboard() {
 
                     <Text style={styles.clientName}>{clientName}</Text>
                     <Text style={styles.clientMeta}>
-                      Location: {county} County • Contact: {phone}
+                      Location: {county} County • Contact: {displayedPhone}
                     </Text>
 
-                    <View style={styles.actionRow}>
-                      <TouchableOpacity
-                        style={styles.joinBtn}
-                        onPress={() => handleJoinCall(session.session_link)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons
-                          name="videocam-outline"
-                          size={18}
-                          color="#FFFFFF"
-                        />
-                        <Text style={styles.joinBtnText}>
-                          Join Virtual Room
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                    {/* Conditional Connection Action */}
+                    {session.session_mode === "phone" ? (
+                      <View style={styles.phoneModeContainer}>
+                        <View style={styles.phoneInfoBox}>
+                          <Ionicons name="call" size={16} color="#0284C7" />
+                          <Text style={styles.phoneInfoText}>
+                            Phone Session:{" "}
+                            <Text style={styles.phoneHighlight}>
+                              {displayedPhone}
+                            </Text>
+                          </Text>
+                        </View>
+
+                        <TouchableOpacity
+                          style={styles.callClientBtn}
+                          onPress={() => handleMakePhoneCall(displayedPhone)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="call" size={18} color="#FFFFFF" />
+                          <Text style={styles.joinBtnText}>Call Client</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          style={styles.joinBtn}
+                          onPress={() => handleJoinCall(session.session_link)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons
+                            name="videocam-outline"
+                            size={18}
+                            color="#FFFFFF"
+                          />
+                          <Text style={styles.joinBtnText}>
+                            Join Virtual Room
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 );
               })
