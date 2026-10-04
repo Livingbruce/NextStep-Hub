@@ -55,6 +55,41 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 8,
   },
+  badgeContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    alignItems: "center",
+    flex: 1,
+  },
+  durationBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#D1FAE5",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  durationBadgeText: {
+    fontSize: 11,
+    color: "#047857",
+    fontWeight: "700",
+  },
+  modeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#F3E8FF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  modeBadgeText: {
+    fontSize: 11,
+    color: "#6B21A8",
+    fontWeight: "700",
+  },
   badge: {
     backgroundColor: "#EFF6FF",
     paddingHorizontal: 10,
@@ -165,6 +200,39 @@ export const styles = StyleSheet.create({
   },
 
   // Link & Call
+  phoneModeContainer: {
+    marginBottom: 14,
+    gap: 10,
+  },
+  phoneInfoBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F0F9FF",
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  phoneInfoText: {
+    fontSize: 13,
+    color: "#0369A1",
+    fontWeight: "500",
+  },
+  phoneHighlight: {
+    fontWeight: "800",
+    color: "#0284C7",
+  },
+  callClientBtn: {
+    backgroundColor: "#16A34A",
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 11,
+    borderRadius: 8,
+    gap: 8,
+  },
   linkContainer: { flexDirection: "row", gap: 8, marginBottom: 10 },
   linkInput: {
     flex: 1,

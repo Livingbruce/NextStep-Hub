@@ -137,48 +137,51 @@ export default function AppointmentsScreen() {
         .from("appointments")
         .select(
           `
+        id,
+        counseling_type,
+        duration_minutes,
+        session_mode,
+        client_call_phone,
+        reasons,
+        other_reason,
+        session_goals,
+        had_therapy_before,
+        agreed_terms,
+        notes,
+        session_link,
+        scheduled_start_time,
+        scheduled_end_time,
+        status,
+        payment_status,
+        payment_amount,
+        currency,
+        action_reason,
+        action_by_role,
+        client:client_id (
           id,
-          counseling_type,
-          reasons,
-          other_reason,
-          session_goals,
-          had_therapy_before,
-          agreed_terms,
-          notes,
-          session_link,
-          scheduled_start_time,
-          scheduled_end_time,
-          status,
-          payment_status,
-          payment_amount,
-          currency,
-          action_reason,
-          action_by_role,
-          client:client_id (
-            id,
-            first_name,
-            middle_name,
-            surname,
-            phone_no,
-            alt_phone_no,
-            gender,
-            county,
-            emergency_phone,
-            emergency_relationship,
-            age,
-            relationship_status,
-            religion,
-            avatar_url
-          ),
-          reviews:appointment_reviews (
-            id,
-            reviewer_id,
-            reviewer_role,
-            counselor_notes,
-            feedback_text,
-            rating
-          )
-        `,
+          first_name,
+          middle_name,
+          surname,
+          phone_no,
+          alt_phone_no,
+          gender,
+          county,
+          emergency_phone,
+          emergency_relationship,
+          age,
+          relationship_status,
+          religion,
+          avatar_url
+        ),
+        reviews:appointment_reviews (
+          id,
+          reviewer_id,
+          reviewer_role,
+          counselor_notes,
+          feedback_text,
+          rating
+        )
+      `,
         )
         .eq("counselor_id", user.id)
         .order("scheduled_start_time", { ascending: true });
@@ -481,6 +484,20 @@ export default function AppointmentsScreen() {
     });
   };
 
+  const handleMakePhoneCall = (phoneNumber) => {
+    if (!phoneNumber) {
+      Alert.alert(
+        "No Phone Number",
+        "No contact phone number available for this client.",
+      );
+      return;
+    }
+    const cleanNumber = phoneNumber.replace(/[^0-9+]/g, "");
+    Linking.openURL(`tel:${cleanNumber}`).catch(() =>
+      Alert.alert("Error", "Unable to open native dialer app."),
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
@@ -569,10 +586,40 @@ export default function AppointmentsScreen() {
                 >
                   {/* Basic Card Overview */}
                   <View style={styles.cardHeader}>
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>
-                        {session.counseling_type} Session
-                      </Text>
+                    <View style={styles.badgeContainer}>
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>
+                          {session.counseling_type} Session
+                        </Text>
+                      </View>
+                      {/* Duration Chip */}
+                      <View style={styles.durationBadge}>
+                        <Ionicons
+                          name="time-outline"
+                          size={12}
+                          color="#047857"
+                        />
+                        <Text style={styles.durationBadgeText}>
+                          {session.duration_minutes || 50} mins
+                        </Text>
+                      </View>
+                      {/* Session Mode Chip */}
+                      {session.session_mode && (
+                        <View style={styles.modeBadge}>
+                          <Ionicons
+                            name={
+                              session.session_mode === "phone"
+                                ? "call-outline"
+                                : "videocam-outline"
+                            }
+                            size={12}
+                            color="#6B21A8"
+                          />
+                          <Text style={styles.modeBadgeText}>
+                            {session.session_mode.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     <View style={styles.timeContainer}>
@@ -730,38 +777,75 @@ export default function AppointmentsScreen() {
                     </View>
                   )}
 
-                  {/* Virtual Meeting Link */}
-                  <View style={styles.linkContainer}>
-                    <TextInput
-                      style={styles.linkInput}
-                      placeholder="Add Google Meet or Zoom link..."
-                      placeholderTextColor="#94A3B8"
-                      value={currentLink}
-                      onChangeText={(text) =>
-                        handleLinkChange(session.id, text)
-                      }
-                    />
-                    <TouchableOpacity
-                      style={styles.saveLinkBtn}
-                      onPress={() => handleSaveLink(session.id)}
-                      disabled={actionLoading}
-                    >
-                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
+                  {/* Virtual Meeting Link & Phone call */}
+                  {session.session_mode === "phone" ? (
+                    <View style={styles.phoneModeContainer}>
+                      <View style={styles.phoneInfoBox}>
+                        <Ionicons name="call" size={16} color="#0284C7" />
+                        <Text style={styles.phoneInfoText}>
+                          Phone Session:{" "}
+                          <Text style={styles.phoneHighlight}>
+                            {session.client_call_phone ||
+                              client?.phone_no ||
+                              "N/A"}
+                          </Text>
+                        </Text>
+                      </View>
 
-                  <TouchableOpacity
-                    style={styles.joinBtn}
-                    onPress={() => handleJoinCall(session.session_link)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name="videocam-outline"
-                      size={18}
-                      color="#FFFFFF"
-                    />
-                    <Text style={styles.joinBtnText}>Join Virtual Room</Text>
-                  </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.callClientBtn}
+                        onPress={() =>
+                          handleMakePhoneCall(
+                            session.client_call_phone || client?.phone_no,
+                          )
+                        }
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="call" size={18} color="#FFFFFF" />
+                        <Text style={styles.joinBtnText}>Call Client</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View>
+                      <View style={styles.linkContainer}>
+                        <TextInput
+                          style={styles.linkInput}
+                          placeholder="Add Google Meet or Zoom link..."
+                          placeholderTextColor="#94A3B8"
+                          value={currentLink}
+                          onChangeText={(text) =>
+                            handleLinkChange(session.id, text)
+                          }
+                        />
+                        <TouchableOpacity
+                          style={styles.saveLinkBtn}
+                          onPress={() => handleSaveLink(session.id)}
+                          disabled={actionLoading}
+                        >
+                          <Ionicons
+                            name="checkmark"
+                            size={18}
+                            color="#FFFFFF"
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.joinBtn}
+                        onPress={() => handleJoinCall(session.session_link)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name="videocam-outline"
+                          size={18}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.joinBtnText}>
+                          Join Virtual Room
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
                   {/* Action Chips */}
                   <View style={styles.actionGrid}>
