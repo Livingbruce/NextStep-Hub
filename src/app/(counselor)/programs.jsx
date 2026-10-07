@@ -20,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { NOTIFICATION_TYPES, notifyAdmins } from "../../../libs/notifications";
 import { supabase } from "../../../libs/supabase";
 import { styles } from "../../styles/(counselor)/programs";
 
