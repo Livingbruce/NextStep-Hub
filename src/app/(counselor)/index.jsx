@@ -1,46 +1,78 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   RefreshControl,
   ScrollView,
   Text,
-  TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { checkAppointmentReminders } from "../../../libs/appointmentsReminder";
 import { supabase } from "../../../libs/supabase";
+import PressableScale from "../../components/client/appointments/PressableScale";
+import { useNow } from "../../components/client/home/time";
+import CounselorSkeleton from "../../components/counselor/dashboard/CounselorSkeleton";
+import NextSessionHero from "../../components/counselor/dashboard/NextSessionHero";
+import ReviewCard from "../../components/counselor/dashboard/ReviewCard";
+import {
+  dayLabel,
+  getAction,
+  phoneOf,
+} from "../../components/counselor/dashboard/sessionAction";
+import SessionRow from "../../components/counselor/dashboard/SessionRow";
 import NotificationBell from "../../components/NotificationBell";
-import { styles } from "../../styles/(counselor)/home";
+import { cd } from "../../styles/(counselor)/dashboardUi";
 import { useAuth } from "../_layout";
 
-export default function CounselorDashboard() {
-  const { user, logout } = useAuth();
+const APPOINTMENTS_ROUTE = "/(counselor)/appointments";
 
-  const [counselorFirstName, setCounselorFirstName] = useState("");
+function Stat({ icon, value, label, index }) {
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 70).duration(380)}
+      style={cd.stat}
+    >
+      <View style={cd.statIcon}>
+        <Ionicons name={icon} size={16} color="#1E3A8A" />
+      </View>
+      <Text style={cd.statValue}>{value}</Text>
+      <Text style={cd.statLabel}>{label}</Text>
+    </Animated.View>
+  );
+}
+
+export default function CounselorDashboard() {
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const { width } = useWindowDimensions();
+  const now = useNow();
+
+  const [firstName, setFirstName] = useState("");
   const [sessions, setSessions] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedReviewId, setExpandedReviewId] = useState(null);
+  const hasLoaded = useRef(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const twoCol = width >= 900;
 
   useFocusEffect(
     useCallback(() => {
+      fetchDashboardData();
       checkAppointmentReminders();
     }, []),
   );
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
+      // Skeleton only on the very first load; later focuses refresh quietly.
+      if (!hasLoaded.current) setLoading(true);
 
       const {
         data: { user: currentUser },
@@ -52,29 +84,18 @@ export default function CounselorDashboard() {
         return;
       }
 
-      // 1. Verify UID against public.profiles and fetch first_name
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData } = await supabase
         .from("profiles")
-        .select("first_name, surname")
+        .select("first_name")
         .eq("id", currentUser.id)
         .maybeSingle();
 
-      if (profileError) {
-        console.warn("Could not fetch user profile:", profileError);
-      }
-
-      // Set first name from DB profile, fallback to user_metadata or email
-      if (profileData?.first_name) {
-        setCounselorFirstName(profileData.first_name);
-      } else if (currentUser?.user_metadata?.first_name) {
-        setCounselorFirstName(currentUser.user_metadata.first_name);
-      } else if (currentUser?.email) {
-        const emailPrefix = currentUser.email.split("@")[0];
-        setCounselorFirstName(
-          emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1),
-        );
-      } else {
-        setCounselorFirstName("Counselor");
+      if (profileData?.first_name) setFirstName(profileData.first_name);
+      else if (currentUser.user_metadata?.first_name)
+        setFirstName(currentUser.user_metadata.first_name);
+      else if (currentUser.email) {
+        const p = currentUser.email.split("@")[0];
+        setFirstName(p.charAt(0).toUpperCase() + p.slice(1));
       }
 
       const { data: appointmentsData, error: appointmentsError } =
@@ -87,10 +108,6 @@ export default function CounselorDashboard() {
           duration_minutes,
           session_mode,
           client_call_phone,
-          reasons,
-          other_reason,
-          session_goals,
-          notes,
           session_link,
           scheduled_start_time,
           scheduled_end_time,
@@ -110,7 +127,7 @@ export default function CounselorDashboard() {
 
       if (appointmentsError) throw appointmentsError;
 
-      // 3. Fetch reviews submitted for this counselor's appointments
+      // Only reviews on THIS counselor's sessions (the old query returned every client review).
       const { data: reviewsData, error: reviewsError } = await supabase
         .from("appointment_reviews")
         .select(
@@ -119,7 +136,8 @@ export default function CounselorDashboard() {
           rating,
           feedback_text,
           created_at,
-          appointment:appointment_id (
+          appointment:appointment_id!inner (
+            counselor_id,
             counseling_type,
             scheduled_start_time,
             client:client_id (
@@ -131,15 +149,18 @@ export default function CounselorDashboard() {
         `,
         )
         .eq("reviewer_role", "client")
-        .order("created_at", { ascending: false });
+        .eq("appointment.counselor_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
 
       if (reviewsError) throw reviewsError;
 
       setSessions(appointmentsData || []);
       setReviews(reviewsData || []);
+      hasLoaded.current = true;
     } catch (err) {
       console.error("Error loading dashboard data:", err);
-      Alert.alert("Error", "Could not load counselor dashboard information.");
+      Alert.alert("Couldn't load dashboard", "Pull down to try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -151,328 +172,249 @@ export default function CounselorDashboard() {
     fetchDashboardData();
   }, []);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
+  const greeting = useMemo(() => {
+    const h = new Date(now).getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
     return "Good evening";
-  };
+  }, [now]);
 
-  const getFirstName = () => counselorFirstName || "Counselor";
+  // ---- Derived data ----
+  const { upcoming, needsAction } = useMemo(() => {
+    const up = [];
+    const late = [];
+    sessions.forEach((s) => {
+      const end = new Date(
+        s.scheduled_end_time || s.scheduled_start_time,
+      ).getTime();
+      (end < now ? late : up).push(s);
+    });
+    return { upcoming: up, needsAction: late };
+  }, [sessions, now]);
 
-  const handleJoinCall = (sessionLink) => {
-    if (!sessionLink || !sessionLink.trim()) {
-      Alert.alert(
-        "Meeting Link Missing",
-        "Please attach a virtual meeting link to this session before joining.",
-        [{ text: "OK" }],
+  const hero = upcoming[0];
+  const rest = upcoming.slice(1);
+
+  const grouped = useMemo(() => {
+    const out = [];
+    rest.forEach((s) => {
+      const label = dayLabel(s.scheduled_start_time);
+      const last = out[out.length - 1];
+      if (last && last.label === label) last.items.push(s);
+      else out.push({ label, items: [s] });
+    });
+    return out;
+  }, [rest]);
+
+  const todayCount = upcoming.filter(
+    (s) => dayLabel(s.scheduled_start_time) === "Today",
+  ).length;
+  const rated = reviews.filter((r) => r.rating);
+  const avg = rated.length
+    ? (rated.reduce((a, r) => a + r.rating, 0) / rated.length).toFixed(1)
+    : "–";
+
+  // ---- Actions ----
+  const goToAppointments = () => router.push(APPOINTMENTS_ROUTE);
+
+  const runAction = (session) => {
+    const action = getAction(session);
+
+    if (action.kind === "call") {
+      const number = phoneOf(session).replace(/[^0-9+]/g, "");
+      if (!number) {
+        Alert.alert(
+          "No phone number",
+          "No contact number is available for this client.",
+        );
+        return;
+      }
+      Linking.openURL(`tel:${number}`).catch(() =>
+        Alert.alert("Error", "Could not open the phone dialer."),
       );
-      return;
-    }
-
-    Linking.openURL(sessionLink).catch(() => {
-      Alert.alert("Error", "Could not open virtual room meeting URL.");
-    });
-  };
-
-  const toggleExpandReview = (id) => {
-    setExpandedReviewId((prev) => (prev === id ? null : id));
-  };
-
-  const formatDateTime = (isoString) => {
-    if (!isoString) return "N/A";
-    const dateObj = new Date(isoString);
-    return dateObj.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const handleMakePhoneCall = (phoneNumber) => {
-    if (!phoneNumber) {
-      Alert.alert(
-        "No Phone Number",
-        "No contact phone number available for this client.",
+    } else if (action.kind === "join") {
+      Linking.openURL(session.session_link).catch(() =>
+        Alert.alert("Error", "Could not open the meeting link."),
       );
-      return;
+    } else {
+      goToAppointments();
     }
-    const cleanNumber = phoneNumber.replace(/[^0-9+]/g, "");
-    Linking.openURL(`tel:${cleanNumber}`).catch(() => {
-      Alert.alert("Error", "Could not open phone dialer app.");
-    });
   };
+
+  // ---- Sections ----
+  const sessionsSection = (
+    <View style={twoCol ? cd.colMain : undefined}>
+      {hero ? (
+        <NextSessionHero
+          session={hero}
+          now={now}
+          onPrimary={() => runAction(hero)}
+          onDetails={goToAppointments}
+        />
+      ) : (
+        <Animated.View entering={FadeIn.duration(300)} style={cd.empty}>
+          <Ionicons name="calendar-outline" size={34} color="#94A3B8" />
+          <Text style={cd.emptyText}>No upcoming sessions scheduled.</Text>
+        </Animated.View>
+      )}
+
+      {grouped.length > 0 && (
+        <>
+          <View style={cd.sectionRow}>
+            <Text style={cd.sectionTitle}>Coming up</Text>
+            <PressableScale onPress={goToAppointments}>
+              <Text style={cd.seeAll}>See all</Text>
+            </PressableScale>
+          </View>
+          {grouped.map((g, gi) => (
+            <View key={g.label}>
+              <Text style={cd.dayLabel}>{g.label}</Text>
+              {g.items.map((s, i) => (
+                <SessionRow
+                  key={s.id}
+                  session={s}
+                  index={gi * 3 + i}
+                  now={now}
+                  onPrimary={() => runAction(s)}
+                  onOpen={goToAppointments}
+                />
+              ))}
+            </View>
+          ))}
+        </>
+      )}
+    </View>
+  );
+
+  const reviewsSection = (
+    <View style={twoCol ? cd.colSide : undefined}>
+      <View style={[cd.sectionRow, twoCol && { marginTop: 0 }]}>
+        <Text style={cd.sectionTitle}>Client reviews</Text>
+        {rated.length > 0 && (
+          <View style={cd.ratingBox}>
+            <Ionicons name="star" size={14} color="#F59E0B" />
+            <Text style={cd.ratingText}>{avg}</Text>
+          </View>
+        )}
+      </View>
+      {reviews.length > 0 ? (
+        reviews.map((r, i) => (
+          <ReviewCard
+            key={r.id}
+            review={r}
+            index={i}
+            expanded={expandedReviewId === r.id}
+            onToggle={() =>
+              setExpandedReviewId((p) => (p === r.id ? null : r.id))
+            }
+          />
+        ))
+      ) : (
+        <Animated.View entering={FadeIn.duration(300)} style={cd.empty}>
+          <Ionicons name="chatbox-ellipses-outline" size={34} color="#94A3B8" />
+          <Text style={cd.emptyText}>No client reviews yet.</Text>
+        </Animated.View>
+      )}
+    </View>
+  );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* Header Bar */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.welcomeSubtitle}>{getGreeting()},</Text>
-          <Text style={styles.welcomeTitle}>{getFirstName()}</Text>
-        </View>
-
-        <View style={styles.headerActions}>
-          <NotificationBell
-            userId={user?.id}
-            color="#0F172A"
-            route="/notifications"
-          />
-
-          <TouchableOpacity
-            style={[styles.actionIconBtn, styles.logoutBtn]}
-            onPress={logout}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
+    <SafeAreaView style={cd.container} edges={["top"]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={cd.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#1E3A8A"
+            colors={["#1E3A8A"]}
+          />
         }
       >
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#1E3A8A"
-            style={{ marginTop: 40 }}
-          />
-        ) : (
-          <>
-            {/* Upcoming Sessions Section */}
-            <Text style={styles.sectionTitle}>Upcoming Sessions</Text>
-            {sessions.length > 0 ? (
-              sessions.map((session) => {
-                const clientName = session.client
-                  ? `${session.client.first_name || ""} ${session.client.surname || ""}`.trim()
-                  : "Client";
-                const displayedPhone =
-                  session.session_mode === "phone"
-                    ? session.client_call_phone ||
-                      session.client?.phone_no ||
-                      "N/A"
-                    : session.client?.phone_no || "N/A";
-                const county = session.client?.county || "Unspecified";
-
-                return (
-                  <View key={session.id} style={styles.sessionCard}>
-                    {/* Card Header with Badges & Time */}
-                    <View style={styles.cardHeader}>
-                      <View style={styles.badgeContainer}>
-                        <View style={styles.badge}>
-                          <Text style={styles.badgeText}>
-                            {session.counseling_type}
-                          </Text>
-                        </View>
-
-                        {/* Duration Badge */}
-                        <View style={styles.durationBadge}>
-                          <Ionicons
-                            name="time-outline"
-                            size={12}
-                            color="#047857"
-                          />
-                          <Text style={styles.durationBadgeText}>
-                            {session.duration_minutes || 50} mins
-                          </Text>
-                        </View>
-
-                        {/* Session Mode Badge */}
-                        {session.session_mode && (
-                          <View style={styles.modeBadge}>
-                            <Ionicons
-                              name={
-                                session.session_mode === "phone"
-                                  ? "call-outline"
-                                  : "videocam-outline"
-                              }
-                              size={12}
-                              color="#6B21A8"
-                            />
-                            <Text style={styles.modeBadgeText}>
-                              {session.session_mode.toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-
-                      <Text style={styles.timeText}>
-                        {formatDateTime(session.scheduled_start_time)}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.clientName}>{clientName}</Text>
-                    <Text style={styles.clientMeta}>
-                      Location: {county} County • Contact: {displayedPhone}
-                    </Text>
-
-                    {/* Conditional Connection Action */}
-                    {session.session_mode === "phone" ? (
-                      <View style={styles.phoneModeContainer}>
-                        <View style={styles.phoneInfoBox}>
-                          <Ionicons name="call" size={16} color="#0284C7" />
-                          <Text style={styles.phoneInfoText}>
-                            Phone Session:{" "}
-                            <Text style={styles.phoneHighlight}>
-                              {displayedPhone}
-                            </Text>
-                          </Text>
-                        </View>
-
-                        <TouchableOpacity
-                          style={styles.callClientBtn}
-                          onPress={() => handleMakePhoneCall(displayedPhone)}
-                          activeOpacity={0.8}
-                        >
-                          <Ionicons name="call" size={18} color="#FFFFFF" />
-                          <Text style={styles.joinBtnText}>Call Client</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <View style={styles.actionRow}>
-                        <TouchableOpacity
-                          style={styles.joinBtn}
-                          onPress={() => handleJoinCall(session.session_link)}
-                          activeOpacity={0.8}
-                        >
-                          <Ionicons
-                            name="videocam-outline"
-                            size={18}
-                            color="#FFFFFF"
-                          />
-                          <Text style={styles.joinBtnText}>
-                            Join Virtual Room
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                );
-              })
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <Ionicons name="calendar-outline" size={36} color="#94A3B8" />
-                <Text style={styles.emptyStateText}>
-                  No upcoming sessions scheduled.
-                </Text>
-              </View>
-            )}
-
-            {/* Client Reviews Section */}
-            <Text style={styles.sectionTitle}>Client Reviews</Text>
-            {reviews.length > 0 ? (
-              reviews.map((item) => {
-                const isExpanded = expandedReviewId === item.id;
-                const clientObj = item.appointment?.client;
-                const clientName = clientObj
-                  ? `${clientObj.first_name || ""} ${clientObj.surname || ""}`.trim()
-                  : "Anonymous Client";
-                const sessionCategory =
-                  item.appointment?.counseling_type || "General Counseling";
-                const sessionDate = formatDateTime(
-                  item.appointment?.scheduled_start_time,
-                );
-                const county = clientObj?.county || "N/A";
-
-                return (
-                  <View key={item.id} style={styles.reviewCard}>
-                    <TouchableOpacity
-                      style={styles.reviewHeader}
-                      onPress={() => toggleExpandReview(item.id)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.reviewMainInfo}>
-                        <View style={styles.reviewTopRow}>
-                          <Text style={styles.reviewClientName}>
-                            {clientName}
-                          </Text>
-                          <View style={styles.starRow}>
-                            {[...Array(item.rating || 0)].map((_, i) => (
-                              <Ionicons
-                                key={i}
-                                name="star"
-                                size={14}
-                                color="#F59E0B"
-                              />
-                            ))}
-                          </View>
-                        </View>
-                        <Text
-                          style={styles.reviewSnippet}
-                          numberOfLines={isExpanded ? undefined : 2}
-                        >
-                          "{item.feedback_text || "No written review provided."}
-                          "
-                        </Text>
-                      </View>
-
-                      <Ionicons
-                        name={isExpanded ? "chevron-up" : "chevron-down"}
-                        size={20}
-                        color="#64748B"
-                        style={styles.chevronIcon}
-                      />
-                    </TouchableOpacity>
-
-                    {isExpanded && (
-                      <View style={styles.reviewDetailsDrawer}>
-                        <Text style={styles.drawerTitle}>
-                          Appointment Details
-                        </Text>
-                        <View style={styles.detailRow}>
-                          <Ionicons
-                            name="pricetag-outline"
-                            size={15}
-                            color="#64748B"
-                          />
-                          <Text style={styles.detailText}>
-                            Category: {sessionCategory}
-                          </Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                          <Ionicons
-                            name="calendar-outline"
-                            size={15}
-                            color="#64748B"
-                          />
-                          <Text style={styles.detailText}>
-                            Date: {sessionDate}
-                          </Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                          <Ionicons
-                            name="location-outline"
-                            size={15}
-                            color="#64748B"
-                          />
-                          <Text style={styles.detailText}>
-                            County: {county} County
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                );
-              })
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <Ionicons
-                  name="chatbox-ellipses-outline"
-                  size={36}
-                  color="#94A3B8"
+        <View style={cd.content}>
+          {/* Header */}
+          <View style={cd.header}>
+            <View>
+              <Text style={cd.greet}>{greeting},</Text>
+              <Text style={cd.name}>{firstName || "Counselor"}</Text>
+            </View>
+            <View style={cd.headerActions}>
+              <View style={cd.iconBtn}>
+                <NotificationBell
+                  userId={user?.id}
+                  color="#0F172A"
+                  route="/notifications"
                 />
-                <Text style={styles.emptyStateText}>
-                  No client reviews recorded yet.
-                </Text>
               </View>
-            )}
-          </>
-        )}
+              <PressableScale
+                haptic
+                style={[cd.iconBtn, cd.logoutBtn]}
+                onPress={logout}
+                accessibilityLabel="Log out"
+              >
+                <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+              </PressableScale>
+            </View>
+          </View>
+
+          {loading ? (
+            <CounselorSkeleton twoCol={twoCol} />
+          ) : (
+            <>
+              <View style={cd.stats}>
+                <Stat
+                  index={0}
+                  icon="today-outline"
+                  value={todayCount}
+                  label="Today"
+                />
+                <Stat
+                  index={1}
+                  icon="calendar-outline"
+                  value={upcoming.length}
+                  label="Upcoming"
+                />
+                <Stat
+                  index={2}
+                  icon="star-outline"
+                  value={avg}
+                  label="Avg rating"
+                />
+              </View>
+
+              {needsAction.length > 0 && (
+                <Animated.View entering={FadeInDown.duration(350)}>
+                  <PressableScale
+                    haptic
+                    style={cd.attention}
+                    onPress={goToAppointments}
+                  >
+                    <Ionicons name="alert-circle" size={22} color="#D97706" />
+                    <Text style={cd.attentionText}>
+                      {needsAction.length === 1
+                        ? "1 past session still needs an update."
+                        : `${needsAction.length} past sessions still need an update.`}
+                    </Text>
+                    <Text style={cd.attentionLink}>Review</Text>
+                  </PressableScale>
+                </Animated.View>
+              )}
+
+              {twoCol ? (
+                <View style={cd.twoCol}>
+                  {sessionsSection}
+                  {reviewsSection}
+                </View>
+              ) : (
+                <>
+                  {sessionsSection}
+                  {reviewsSection}
+                </>
+              )}
+            </>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

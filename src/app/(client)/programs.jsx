@@ -1,46 +1,77 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Linking,
+  RefreshControl,
   ScrollView,
   Text,
-  TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
+import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../libs/supabase";
+import AnimatedTabs from "../../components/client/appointments/AnimatedTabs";
+import PressableScale from "../../components/client/appointments/PressableScale";
+import { SECTORS } from "../../components/client/careerSectors";
+import { POST_CAMPUS_MODULES } from "../../components/client/postUni";
+import { PATHWAYS } from "../../components/client/preUni";
 import { PROGRAMS } from "../../components/client/Programs";
-import { styles } from "../../styles/(client)/programsMain";
+import CategoryCard from "../../components/client/programs/CategoryCard";
+import EnrolledCard from "../../components/client/programs/EnrolledCard";
+import ProgramsSkeleton from "../../components/client/programs/ProgramSkeleton";
+import { pg } from "../../styles/(client)/programsUi";
 import { useAuth } from "../_layout";
+
+const GAP = 16;
+const MAX_CONTENT = 1000;
+const H_PADDING = 20;
+const GRACE_MS = 3 * 60 * 60 * 1000;
+
+const MODULE_COUNTS = {
+  career: SECTORS.length,
+  preCampus: PATHWAYS.length,
+  postCampus: POST_CAMPUS_MODULES.length,
+};
 
 export default function ProgramsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { width } = useWindowDimensions();
 
-  const [myPrograms, setMyPrograms] = useState([]);
+  const [enrolled, setEnrolled] = useState([]); // [{ program, status }]
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [activeTab, setActiveTab] = useState("mine");
+  const hasLoaded = useRef(false);
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchMyPrograms();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
+  // ---- Responsive grid: 1 column on phones, 2 on tablets / landscape ----
+  const columns = width >= 720 ? 2 : 1;
+  const contentWidth = Math.min(width, MAX_CONTENT) - H_PADDING * 2;
+  const itemWidth = columns === 1 ? "100%" : (contentWidth - GAP) / columns;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) fetchMyPrograms();
+      else setLoading(false);
+    }, [user?.id]),
+  );
 
   const fetchMyPrograms = async () => {
     try {
-      setLoading(true);
+      // Skeleton only on the very first load; later focuses refresh quietly.
+      if (!hasLoaded.current) setLoading(true);
+      setError(false);
 
-      // Fetch enrolled programs by joining program_participants and programs tables
-      const { data, error } = await supabase
+      const { data, error: err } = await supabase
         .from("program_participants")
         .select(
           `
           id,
+          status,
           created_at,
           program:program_id (
             id,
@@ -49,27 +80,43 @@ export default function ProgramsScreen() {
             category,
             starts_at,
             location_type,
-            location_details
+            location_details,
+            is_paid,
+            amount,
+            currency,
+            poster_url
           )
         `,
         )
         .eq("client_id", user.id);
 
-      if (error) {
-        console.error("Error fetching my programs:", error);
-      } else if (data) {
-        // Extract program objects
-        const enrolledList = data
-          .map((item) => item.program)
-          .filter((p) => p !== null);
-        setMyPrograms(enrolledList);
-      }
-    } catch (err) {
-      console.error("Unexpected error fetching programs:", err);
+      if (err) throw err;
+
+      const list = (data || [])
+        .map((row) => ({
+          program: Array.isArray(row.program) ? row.program[0] : row.program,
+          status: row.status,
+        }))
+        .filter((r) => r.program);
+
+      setEnrolled(list);
+
+      // First load: if there is nothing enrolled yet, start on Explore.
+      if (!hasLoaded.current && list.length === 0) setActiveTab("explore");
+      hasLoaded.current = true;
+    } catch (e) {
+      console.error("Error fetching my programs:", e);
+      setError(true);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchMyPrograms();
+  }, [user?.id]);
 
   const handleOpenAction = (locationType, locationDetails) => {
     if (!locationDetails) {
@@ -94,167 +141,183 @@ export default function ProgramsScreen() {
     }
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.maxContainer}>
-        {/* Top Bar Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.7}
+  const openDetails = (program) =>
+    router.push({
+      pathname: "programs/regPrograms",
+      params: { programId: program.id },
+    });
+
+  // ---- Derived lists ----
+  const { upcoming, past } = useMemo(() => {
+    const now = Date.now();
+    const up = [];
+    const pa = [];
+    enrolled.forEach((r) => {
+      const t = new Date(r.program.starts_at).getTime();
+      (t + GRACE_MS >= now ? up : pa).push(r);
+    });
+    up.sort(
+      (a, b) => new Date(a.program.starts_at) - new Date(b.program.starts_at),
+    );
+    pa.sort(
+      (a, b) => new Date(b.program.starts_at) - new Date(a.program.starts_at),
+    );
+    return { upcoming: up, past: pa };
+  }, [enrolled]);
+
+  const tabs = [
+    { key: "mine", label: "My programs", count: enrolled.length },
+    { key: "explore", label: "Explore", count: PROGRAMS.length },
+  ];
+
+  const renderEnrolled = (rows, isPast, offset = 0) =>
+    rows.map((r, i) => (
+      <EnrolledCard
+        key={r.program.id}
+        program={r.program}
+        status={r.status}
+        past={isPast}
+        index={offset + i}
+        style={{ width: itemWidth }}
+        onOpen={() => openDetails(r.program)}
+        onAction={handleOpenAction}
+      />
+    ));
+
+  const mineBody = () => {
+    if (enrolled.length === 0) {
+      return (
+        <View key="mine-empty" style={pg.empty}>
+          <Animated.View
+            entering={ZoomIn.duration(400).springify().damping(12)}
+            style={pg.emptyCircle}
           >
-            <Ionicons name="arrow-back" size={22} color="#0F172A" />
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Programs</Text>
+            <Ionicons name="school-outline" size={44} color="#936D9A" />
+          </Animated.View>
+          <Animated.Text entering={FadeIn.delay(150)} style={pg.emptyTitle}>
+            You're not enrolled yet
+          </Animated.Text>
+          <Animated.Text entering={FadeIn.delay(220)} style={pg.emptyText}>
+            Join a guidance program or workshop and it will show up here.
+          </Animated.Text>
+          <PressableScale
+            haptic
+            style={pg.cta}
+            onPress={() => setActiveTab("explore")}
+          >
+            <Text style={pg.ctaText}>Explore programs</Text>
+          </PressableScale>
         </View>
+      );
+    }
 
-        {/* Scrollable List */}
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Enrolled Status Card / My Programs */}
-          <View style={styles.myProgramsSection}>
-            <Text style={styles.sectionTitle}>My Programs</Text>
-
-            {loading ? (
-              <ActivityIndicator
-                size="small"
-                color="#936D9A"
-                style={{ marginVertical: 12 }}
-              />
-            ) : myPrograms.length > 0 ? (
-              myPrograms.map((program) => (
-                <View key={program.id} style={styles.enrolledCard}>
-                  <View style={styles.enrolledHeaderRow}>
-                    <Text style={styles.enrolledTitle}>{program.title}</Text>
-                    <View style={styles.enrolledBadge}>
-                      <Text style={styles.enrolledBadgeText}>Enrolled</Text>
-                    </View>
-                  </View>
-
-                  {program.description ? (
-                    <Text style={styles.enrolledDescription} numberOfLines={2}>
-                      {program.description}
-                    </Text>
-                  ) : null}
-
-                  {program.starts_at && (
-                    <View style={styles.timeRow}>
-                      <Ionicons name="time-outline" size={14} color="#64748B" />
-                      <Text style={styles.timeText}>
-                        {new Date(program.starts_at).toLocaleString("en-US", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Dynamic Action Button depending on location_type */}
-                  {program.location_type === "virtual" ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.actionButton,
-                        { backgroundColor: "#0284C7" },
-                      ]}
-                      activeOpacity={0.8}
-                      onPress={() =>
-                        handleOpenAction(
-                          program.location_type,
-                          program.location_details,
-                        )
-                      }
-                    >
-                      <Ionicons name="videocam" size={15} color="#FFFFFF" />
-                      <Text style={styles.actionButtonText}>Join Meeting</Text>
-                    </TouchableOpacity>
-                  ) : program.location_type === "phone" ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.actionButton,
-                        { backgroundColor: "#2563EB" },
-                      ]}
-                      activeOpacity={0.8}
-                      onPress={() =>
-                        handleOpenAction(
-                          program.location_type,
-                          program.location_details,
-                        )
-                      }
-                    >
-                      <Ionicons name="call" size={15} color="#FFFFFF" />
-                      <Text style={styles.actionButtonText}>Join Call</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      style={[
-                        styles.actionButton,
-                        { backgroundColor: "#475569" },
-                      ]}
-                      activeOpacity={0.8}
-                      onPress={() =>
-                        handleOpenAction(
-                          program.location_type,
-                          program.location_details,
-                        )
-                      }
-                    >
-                      <Ionicons name="location" size={15} color="#FFFFFF" />
-                      <Text style={styles.actionButtonText}>
-                        {program.location_details
-                          ? `Venue: ${program.location_details}`
-                          : "Location Details"}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))
-            ) : (
-              <Text style={styles.sectionDescription}>
-                You are currently not enrolled in any guidance programs.
-              </Text>
-            )}
+    return (
+      <View key="mine">
+        <Text style={pg.sectionLabel}>Upcoming ({upcoming.length})</Text>
+        {upcoming.length > 0 ? (
+          <View style={[pg.grid, { gap: GAP }]}>
+            {renderEnrolled(upcoming, false)}
           </View>
+        ) : (
+          <Text style={[pg.subtitle, { marginBottom: 8 }]}>
+            Nothing coming up. Explore programs to join one.
+          </Text>
+        )}
 
-          {/* Available Programs List */}
-          <View style={styles.availablePrograms}>
-            <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>
-              Available Programs
+        {past.length > 0 && (
+          <>
+            <Text style={[pg.sectionLabel, { marginTop: 24 }]}>
+              Past ({past.length})
             </Text>
-            {PROGRAMS.map((item) => (
-              <View key={item.id} style={styles.categoryItem}>
-                <View style={styles.categoryHeaderRow}>
-                  <View style={styles.categoryIconCircle}>
-                    <Ionicons name={item.icon} size={22} color="#0F172A" />
-                  </View>
-                  <Text style={styles.categoryLabel} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                </View>
-
-                <Text style={styles.categoryDescription} numberOfLines={3}>
-                  {item.description}
-                </Text>
-
-                <TouchableOpacity
-                  style={styles.enrollButton}
-                  activeOpacity={0.8}
-                  onPress={() => router.push(`/programs/${item.id}`)}
-                >
-                  <Text style={styles.enrollButtonText}>Explore</Text>
-                  <Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+            <View style={[pg.grid, { gap: GAP }]}>
+              {renderEnrolled(past, true, upcoming.length)}
+            </View>
+          </>
+        )}
       </View>
+    );
+  };
+
+  const exploreBody = () => (
+    <View key="explore" style={[pg.grid, { gap: GAP }]}>
+      {PROGRAMS.map((item, i) => (
+        <CategoryCard
+          key={item.id}
+          item={item}
+          modules={MODULE_COUNTS[item.id]}
+          index={i}
+          style={{ width: itemWidth }}
+          onPress={() => router.push(`/programs/${item.id}`)}
+        />
+      ))}
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={pg.container} edges={["top"]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={pg.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#936D9A"
+            colors={["#936D9A"]}
+          />
+        }
+      >
+        <View style={pg.content}>
+          {/* Header */}
+          <View style={pg.headerRow}>
+            {router.canGoBack() && (
+              <PressableScale
+                haptic
+                style={pg.backBtn}
+                onPress={() => router.back()}
+                accessibilityLabel="Go back"
+              >
+                <Ionicons name="arrow-back" size={20} color="#0F172A" />
+              </PressableScale>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={pg.title}>Programs</Text>
+              <Text style={pg.subtitle}>
+                Guidance tracks and live workshops
+              </Text>
+            </View>
+          </View>
+
+          <AnimatedTabs
+            tabs={tabs}
+            active={activeTab}
+            onChange={setActiveTab}
+          />
+
+          {error && (
+            <Animated.View entering={FadeIn.duration(250)} style={pg.errorBox}>
+              <Ionicons name="alert-circle" size={20} color="#DC2626" />
+              <Text style={pg.errorText}>Couldn't load your programs.</Text>
+              <PressableScale onPress={fetchMyPrograms}>
+                <Text style={pg.errorRetry}>Retry</Text>
+              </PressableScale>
+            </Animated.View>
+          )}
+
+          {/* Body */}
+          {activeTab === "mine" && loading ? (
+            <ProgramsSkeleton
+              count={columns * 2}
+              itemWidth={itemWidth}
+              gap={GAP}
+            />
+          ) : activeTab === "mine" ? (
+            mineBody()
+          ) : (
+            exploreBody()
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
