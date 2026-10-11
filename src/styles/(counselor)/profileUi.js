@@ -1,0 +1,202 @@
+import { StyleSheet } from "react-native";
+
+const BLUE = "#1E3A8A";
+
+export const pf = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 40,
+    alignItems: "center",
+  },
+  content: { width: "100%", maxWidth: 900 },
+
+  // Header
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
+    minHeight: 40,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#0F172A",
+    letterSpacing: -0.4,
+  },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: BLUE,
+  },
+  editBtnText: { fontSize: 14, fontWeight: "700", color: BLUE },
+  saveBtn: { backgroundColor: BLUE },
+  saveBtnText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
+  cancelBtn: { paddingHorizontal: 10, paddingVertical: 8 },
+  cancelText: { fontSize: 14, fontWeight: "600", color: "#EF4444" },
+
+  // Avatar block
+  hero: { alignItems: "center", marginBottom: 20 },
+  avatarWrap: { width: 104, height: 104, borderRadius: 52 },
+  avatarImg: { width: 104, height: 104, borderRadius: 52 },
+  avatarFallback: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: BLUE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitials: { color: "#FFFFFF", fontSize: 36, fontWeight: "700" },
+  avatarBusy: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 52,
+    backgroundColor: "rgba(15,23,42,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  camera: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#0F172A",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+  name: { fontSize: 21, fontWeight: "800", color: "#0F172A", marginTop: 12 },
+  role: { fontSize: 13, fontWeight: "700", color: BLUE, marginTop: 3 },
+  roleChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  roleChipText: { fontSize: 12, fontWeight: "700", color: BLUE },
+
+  // Completion
+  completion: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 16,
+    marginBottom: 16,
+  },
+  cTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  cTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+  cPct: { fontSize: 14, fontWeight: "800", color: BLUE },
+  track: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#E2E8F0",
+    overflow: "hidden",
+  },
+  fill: { height: "100%", borderRadius: 4, backgroundColor: BLUE },
+  cHint: { fontSize: 12, color: "#64748B", marginTop: 8 },
+
+  // Layout
+  columns: { flexDirection: "row", gap: 16, alignItems: "flex-start" },
+  column: { flex: 1, gap: 16 },
+
+  // Section card
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 18,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+  cardIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardTitle: { fontSize: 15, fontWeight: "800", color: "#0F172A" },
+
+  // Fields
+  field: { marginBottom: 16 },
+  label: { fontSize: 12, color: "#64748B", fontWeight: "600", marginBottom: 3 },
+  value: { fontSize: 14, fontWeight: "600", color: "#0F172A" },
+  muted: { color: "#94A3B8", fontWeight: "500" },
+  inputBox: { borderWidth: 1.5, borderRadius: 10, marginTop: 2 },
+  input: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0F172A",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  area: { minHeight: 100, textAlignVertical: "top" },
+  hint: { fontSize: 11, color: "#94A3B8", marginTop: 4 },
+  bio: { fontSize: 14, color: "#334155", lineHeight: 22 },
+
+  // Chips
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+  },
+  chipOn: { backgroundColor: "#EFF6FF", borderColor: BLUE },
+  chipText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
+  chipTextOn: { color: BLUE, fontWeight: "800" },
+  addRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+  addBtn: {
+    width: 44,
+    borderRadius: 10,
+    backgroundColor: BLUE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  bottomSave: {
+    marginTop: 16,
+    backgroundColor: BLUE,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  bottomSaveText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+});
