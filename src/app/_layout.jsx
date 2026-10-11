@@ -43,11 +43,21 @@ export default function RootLayout() {
     async function restoreSession() {
       try {
         const stored = await AsyncStorage.getItem(SESSION_KEY);
-        if (isMounted && stored) {
-          const fresh = await fetchFreshStatus(JSON.parse(stored));
-          setUser(fresh);
-          await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
+        if (!stored) return;
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          await AsyncStorage.removeItem(SESSION_KEY);
+          return;
         }
+
+        const fresh = await fetchFreshStatus(JSON.parse(stored));
+        if (!isMounted) return;
+        setUser(fresh);
+        await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
       } catch (err) {
         console.warn("Failed to restore session:", err);
       } finally {
