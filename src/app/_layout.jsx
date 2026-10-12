@@ -15,6 +15,12 @@ SplashScreen.preventAutoHideAsync();
 
 const SESSION_KEY = "nsm_session_user";
 
+// Global cache to prevent session restoration from re-running on re-mounts
+let cachedUser = null;
+let isSessionRestoredGlobal = false;
+let hasPreloaderFinishedGlobally = false;
+let restorationPromise = null;
+
 const AuthContext = createContext({
   user: null,
   login: () => {},
@@ -25,9 +31,13 @@ const AuthContext = createContext({
 export const useAuth = () => useContext(AuthContext);
 
 export default function RootLayout() {
-  const [user, setUser] = useState(null);
-  const [isSessionRestored, setIsSessionRestored] = useState(false);
-  const [isPreloaderDone, setIsPreloaderDone] = useState(false);
+  const [user, setUser] = useState(cachedUser);
+  const [isSessionRestored, setIsSessionRestored] = useState(
+    isSessionRestoredGlobal,
+  );
+  const [isPreloaderDone, setIsPreloaderDone] = useState(
+    hasPreloaderFinishedGlobally,
+  );
   const segments = useSegments();
   const router = useRouter();
   const navigationState = useRootNavigationState();
@@ -36,40 +46,41 @@ export default function RootLayout() {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
 
-  // 1. Restore local session
+  // 1. Restore local session globally (runs only once per app lifecycle)
   useEffect(() => {
-    let isMounted = true;
+    if (isSessionRestoredGlobal) return;
 
-    async function restoreSession() {
-      try {
-        const stored = await AsyncStorage.getItem(SESSION_KEY);
-        if (!stored) return;
+    if (!restorationPromise) {
+      restorationPromise = (async () => {
+        try {
+          const stored = await AsyncStorage.getItem(SESSION_KEY);
+          if (!stored) return null;
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
 
-        if (!session) {
-          await AsyncStorage.removeItem(SESSION_KEY);
-          return;
+          if (!session) {
+            await AsyncStorage.removeItem(SESSION_KEY);
+            return null;
+          }
+
+          const fresh = await fetchFreshStatus(JSON.parse(stored));
+          await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
+          return fresh;
+        } catch (err) {
+          console.warn("Failed to restore session:", err);
+          return null;
         }
-
-        const fresh = await fetchFreshStatus(JSON.parse(stored));
-        if (!isMounted) return;
-        setUser(fresh);
-        await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
-      } catch (err) {
-        console.warn("Failed to restore session:", err);
-      } finally {
-        if (isMounted) setIsSessionRestored(true);
-      }
+      })();
     }
 
-    restoreSession();
-
-    return () => {
-      isMounted = false;
-    };
+    restorationPromise.then((freshUser) => {
+      cachedUser = freshUser;
+      isSessionRestoredGlobal = true;
+      setUser(freshUser);
+      setIsSessionRestored(true);
+    });
   }, []);
 
   // 2. Fetch fresh database flags (approved, suspended)
@@ -96,7 +107,7 @@ export default function RootLayout() {
     }
   };
 
-  // 3. Boolean Status & Role Guard
+  // 3. Status & Role Guard (runs once preloader is done)
   useEffect(() => {
     if (!isPreloaderDone) return;
     if (!navigationState?.key) return;
@@ -148,6 +159,7 @@ export default function RootLayout() {
     };
 
     const sessionUser = await fetchFreshStatus(base);
+    cachedUser = sessionUser;
     setUser(sessionUser);
 
     try {
@@ -155,11 +167,10 @@ export default function RootLayout() {
     } catch (err) {
       console.warn("Failed to persist session:", err);
     }
-
-    await fetchFreshStatus(sessionUser);
   };
 
   const logout = async () => {
+    cachedUser = null;
     setUser(null);
     try {
       await AsyncStorage.removeItem(SESSION_KEY);
@@ -172,15 +183,20 @@ export default function RootLayout() {
   const checkStatus = async () => {
     if (!user) return;
     const fresh = await fetchFreshStatus(user);
+    cachedUser = fresh;
     setUser(fresh);
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
   };
 
+  // Show preloader until session check is complete AND animation finishes
   if (!isPreloaderDone) {
     return (
       <Preloader
         isReady={isSessionRestored}
-        onFinish={() => setIsPreloaderDone(true)}
+        onFinish={() => {
+          hasPreloaderFinishedGlobally = true;
+          setIsPreloaderDone(true);
+        }}
       />
     );
   }
