@@ -1,59 +1,73 @@
 import { supabase } from "../../libs/supabase";
 
-const getBaseUrl = () => {
-  return (
-    process.env.EXPO_PUBLIC_EMAIL_SERVICE_URL ||
-    process.env.EXPO_NEXT_PUBLIC_EMAIL_SERVICE_URL ||
-    "https://bbzljfqovlewexghzybl.supabase.co/functions/v1/send-email"
-  );
-};
+const ENDPOINTS = [
+  process.env.EXPO_PUBLIC_EMAIL_SERVICE_URL,
+  process.env.EXPO_PUBLIC_LOCAL_EMAIL_SERVICE_URL,
+]
+  .map((u) => (u || "").trim())
+  .filter(Boolean);
 
-const BASE_URL = getBaseUrl().trim();
+const API_KEY = process.env.EXPO_PUBLIC_API_SECRET_KEY;
+const TIMEOUT_MS = [30000, 10000];
+
+async function postWithTimeout(url, options, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export const sendEmail = async ({ to, subject, text, html }) => {
-  try {
-    console.log("Email API URL:", BASE_URL);
-
-    // Grab current user session token if available
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const token = session?.access_token;
-
-    const headers = {
-      "Content-Type": "application/json",
-    };
-
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(BASE_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ to, subject, text, html }),
-    });
-
-    const rawText = await response.text();
-    console.log("Supabase Raw Response Status:", response.status);
-    console.log("Supabase Raw Response Body:", rawText);
-
-    let data;
-    try {
-      data = JSON.parse(rawText);
-    } catch {
-      throw new Error(
-        `Server returned non-JSON response (${response.status}): ${rawText.slice(0, 100)}`,
-      );
-    }
-
-    if (!response.ok) {
-      throw new Error(data.error || data.message || "Failed to send email");
-    }
-
-    return { success: true, data };
-  } catch (error) {
-    console.error("Email Dispatch Error:", error.message);
-    return { success: false, error: error.message };
+  if (!ENDPOINTS.length) {
+    return { success: false, error: "No email service URL configured" };
   }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const headers = { "Content-Type": "application/json" };
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`;
+  }
+  if (API_KEY) headers["x-api-key"] = API_KEY;
+
+  const body = JSON.stringify({ to, subject, text, html });
+  let lastError = "Failed to send email";
+
+  for (let i = 0; i < ENDPOINTS.length; i++) {
+    const url = ENDPOINTS[i];
+    try {
+      const response = await postWithTimeout(
+        url,
+        { method: "POST", headers, body },
+        TIMEOUT_MS[i] ?? 10000,
+      );
+
+      const raw = await response.text();
+      let data = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(`Non-JSON response (${response.status})`);
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || data.message || `HTTP ${response.status}`,
+        );
+      }
+
+      return { success: true, data, via: url };
+    } catch (err) {
+      lastError = err.name === "AbortError" ? "Request timed out" : err.message;
+      console.warn(`Email via ${url} failed: ${lastError}`);
+    }
+  }
+
+  console.error("All email endpoints failed:", lastError);
+  return { success: false, error: lastError };
 };
