@@ -78,11 +78,65 @@ function Cloud({ position, width, drift, duration }) {
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: interpolate(t.get(), [0, 1], [-drift, drift]) }],
   }));
+
+  const h = width * 0.65;
+
   return (
     <Animated.View
       entering={FadeIn.delay(700).duration(800)}
-      style={[styles.cloud, position, { width }, style]}
-    />
+      style={[styles.cloud, position, { width, height: h }, style]}
+    >
+      {/* flat base */}
+      <View
+        style={[
+          styles.puff,
+          {
+            left: 0,
+            bottom: 0,
+            width,
+            height: h * 0.45,
+            borderRadius: h * 0.225,
+          },
+        ]}
+      />
+      {/* three round puffs on top */}
+      <View
+        style={[
+          styles.puff,
+          {
+            left: width * 0.12,
+            bottom: h * 0.25,
+            width: width * 0.38,
+            height: width * 0.38,
+            borderRadius: width * 0.19,
+          },
+        ]}
+      />
+      <View
+        style={[
+          styles.puff,
+          {
+            left: width * 0.3,
+            bottom: h * 0.2,
+            width: width * 0.5,
+            height: width * 0.5,
+            borderRadius: width * 0.25,
+          },
+        ]}
+      />
+      <View
+        style={[
+          styles.puff,
+          {
+            left: width * 0.62,
+            bottom: h * 0.25,
+            width: width * 0.32,
+            height: width * 0.32,
+            borderRadius: width * 0.16,
+          },
+        ]}
+      />
+    </Animated.View>
   );
 }
 
@@ -187,9 +241,10 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 18 },
   cloud: {
     position: "absolute",
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#F8FAF8",
+  },
+  puff: {
+    position: "absolute",
+    backgroundColor: "#FFFFFF",
   },
   sparkle: {
     position: "absolute",
