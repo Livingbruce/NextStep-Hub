@@ -4,7 +4,7 @@
     "slug": "NSMentorship",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logoimage.jpg",
     "scheme": "nextstephub",
     "userInterfaceStyle": "light",
     "ios": {
@@ -13,9 +13,9 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#090D16",
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/icon.png"
+        "foregroundImage": "./assets/images/download.png",
+        "backgroundImage": "./assets/images/iconlogo-removebg.png",
+        "monochromeImage": "./assets/images/monochrome-removebg.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.living_bruce.NSMentorship"
@@ -23,7 +23,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/logoimage.jpg"
     },
     "plugins": [
       "expo-router",
