@@ -2,286 +2,405 @@
 
 # 🌱 NextStep Hub
 
-### Step confidently into your next chapter.
+### Step Confidently Into Your Next Chapter.
+**Proprietary Virtual Mentorship and Counseling Platform for Kenyan Youth**
 
-Virtual mentorship and counseling for youth, from high school to campus to career.
+*Exclusively Owned and Commissioned by **desolNurturers** • Founded & Directed by **Counselor Lucy***
 
-_By desolNurturers_
-
-![Expo](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo)
-![React Native](https://img.shields.io/badge/React%20Native-0.86-61DAFB?logo=react&logoColor=black)
-![Supabase](https://img.shields.io/badge/Backend-Supabase-3ECF8E?logo=supabase&logoColor=white)
-![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20Web-blue)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary%20%7C%20All%20Rights%20Reserved-red.svg?style=for-the-badge)](./LICENSE)
+[![Jurisdiction](https://img.shields.io/badge/Jurisdiction-Republic%20of%20Kenya-darkgreen?style=for-the-badge)](https://kenyalaw.org)
+[![Copyright Act](https://img.shields.io/badge/Protected%20By-Copyright%20Act%20Cap%20130-blue?style=for-the-badge)](https://www.copyright.go.ke)
+[![Expo SDK 57](https://img.shields.io/badge/Expo-SDK%2057-000020?style=for-the-badge&logo=expo)](https://expo.dev)
+[![Supabase](https://img.shields.io/badge/Backend-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![Compliance](https://img.shields.io/badge/Compliance-Kenya%20Data%20Protection%20Act%202019-orange?style=for-the-badge)](https://www.odpc.go.ke)
 
 </div>
 
 ---
 
-## 📖 About
-
-**NextStep Hub** is a mobile app that connects young people with trusted mentors and counselors at every major life transition. Whether you are choosing a university course, settling into campus life, planning your career, or simply need someone to talk to, NextStep Hub makes it easy to learn, get guided, and book a private one-on-one virtual session.
-
-The app serves three types of users, each with their own tailored experience:
-
-| Role             | Who they are                                | What they can do                                                             |
-| ---------------- | ------------------------------------------- | ---------------------------------------------------------------------------- |
-| 🎓 **Client**    | Students, graduates and young professionals | Explore guidance programs, book sessions, manage appointments, leave reviews |
-| 🧑‍🏫 **Counselor** | Verified mentors and counselors             | Manage sessions, set availability, run programs, view client feedback        |
-| 🛡️ **Admin**     | Platform administrators                     | Approve staff, set pricing, oversee appointments and programs                |
+> ### ⚠️ PROPRIETARY & CONFIDENTIAL LEGAL WARNING
+> **This software, source code, design architecture, workflows, and localized mentorship content are the exclusive, proprietary intellectual property of desolNurturers (Nairobi, Kenya), founded and owned by Counselor Lucy.**
+> 
+> **THIS IS NOT OPEN-SOURCE, CHARITY, OR PUBLIC-DOMAIN SOFTWARE.**  
+> Any unauthorized copying, cloning, decompilation, distribution, reverse engineering, publication, hosting on unauthorized servers, or commercial exploitation of this application—in whole or in part—is strictly prohibited and constitutes an immediate violation of the **Copyright Act (Cap. 130 of the Laws of Kenya)** and international copyright treaties. Violators will face immediate ex-parte injunctions, commercial damages claims, and criminal prosecution.
 
 ---
 
-## ✨ Features
+## 📖 About NextStep Hub
 
-### For Clients
-
-- **Guided learning tracks** covering three journeys:
-  - **Pre-Campus**: high school to university transition, course selection, hostel booking, campus life, study skills, relationships, parent-student dynamics and KUCCPS application support.
-  - **Post-Campus**: life after graduation, postgraduate study and scholarships, CV and portfolio building, job market and interview prep, entrepreneurship, financial management and mental health.
-  - **Career Guidance**: career discovery, industry exposure, career pivots, leadership growth, income diversification, purpose and passion (Ikigai), and career reset.
-- **Easy step-by-step booking**: choose a counseling type (Individual, Group, Couple, Family, Student, Teen), share your reasons and goals, accept the terms, pick a counselor, then choose a date and time.
-- **Smart scheduling rules**: sessions are Monday to Friday, 8:00 AM to 5:00 PM, with a lunch break from 1:00 PM to 2:00 PM.
-- **Appointment management**: view upcoming sessions, cancel with a reason, leave a review after a session, or delete old records.
-- **Personal profile** with photo upload and emergency contact details.
-- **Privacy first**: confidentiality terms aligned with Kenya's Data Protection Act, 2019.
-
-### For Counselors
-
-- **Dashboard** with upcoming sessions and one-tap **Join Virtual Room** (Google Meet or Zoom).
-- **Calendar control**: block out unavailable dates; weekends are non-working by default.
-- **Session actions**: mark as attended (with notes), postpone, transfer, or cancel, with a full history log.
-- **Program management**: create, edit and delete mentorship programs, view registered participants and mark attendance.
-- **Client reviews** with star ratings and session details.
-- **Professional profile** with specializations, bio and experience.
-
-### For Admins
-
-- **Overview dashboard** with quick actions, upcoming events and recent activity.
-- **Appointments archive** organized by year and month, including counselor remarks and client reviews.
-- **Programs & events** split into upcoming and past.
-- **Staff management**: whitelist counselor and admin emails, approve, suspend, reactivate or remove staff.
-- **Pricing control**: set the standard session fee with quick presets.
-- **Settings**: notifications, biometric unlock and database backup controls.
-
-### Security & Access
-
-- Email and password sign-in powered by **Supabase Auth**.
-- **Role-based routing**: every user is taken to the right experience automatically.
-- **Approval workflow**: counselor and admin accounts must be approved before use.
-- **Suspension support**: suspended accounts are blocked with a clear message.
-- Session tokens stored securely with **Expo SecureStore**.
+**NextStep Hub** is a commercial digital health, coaching, and psychological counseling mobile platform developed specifically for **desolNurturers**. Built under the clinical and professional guidance of **Counselor Lucy**, the platform addresses the high-anxiety transition periods faced by Kenyan youth: from high school exit and university admissions via KUCCPS to campus life, graduation, HELB debt management, and career advancement.
 
 ---
 
-## 🛠️ Tech Stack
+## 👥 Three-Tier Role Architecture
 
-- **Framework:** [Expo](https://expo.dev) (SDK 57) with [React Native](https://reactnative.dev) 0.86 and React 19
-- **Navigation:** [Expo Router](https://docs.expo.dev/router/introduction) (file-based routing)
-- **Backend:** [Supabase](https://supabase.com) (Auth, Postgres database, Storage)
-- **UI & UX:** Ionicons, React Native Reanimated, custom animated preloader
-- **Utilities:** `react-native-calendars`, `@react-native-community/datetimepicker`, `expo-image-picker`, `expo-secure-store`, AsyncStorage
+NextStep Hub enforces strict role-based routing and access segregation:
+
+| Role | Target Demographic | Authorized Actions |
+| :--- | :--- | :--- |
+| 🎓 **Client** | High school graduates, university/TVET students, job seekers | Browse structured guidance tracks, book private 1-on-1 virtual or phone counseling sessions, register for workshops, submit session feedback, and manage personal profile & emergency contact records. |
+| 🧑‍🏫 **Counselor** | Whitelisted therapists & certified mentors | Review assigned sessions, manage work schedule & block absent days, generate and attach virtual room links (Google Meet / Zoom), record clinical session notes, and track client reviews. |
+| 🛡️ **Admin** | desolNurturers directors & supervisory staff | Manage counselor and admin whitelist registries, approve/suspend staff accounts, configure standard session pricing (KES), manage program schedules, and inspect global audit logs. |
 
 ---
 
-## 📁 Project Structure
+## 🧭 Localized Kenyan Guidance Curriculum
 
-```
-├── libs/
-│   └── supabase.js              # Supabase client setup
+The application comes pre-loaded with proprietary guidance modules created for the Kenyan educational and economic context:
+
+### 1. 🏫 Pre-Campus Guidance (High School to University)
+- **KUCCPS Placement & Cluster Points:** Calculating cluster points, cut-off revision strategies, and Inter-University Transfer (IUT) procedures.
+- **Course vs. Career Alignment:** Mapping degree programs against actual Kenyan industry demand.
+- **Hostel & Security Vetting:** Assessing on-campus vs. off-campus accommodation, sanitation, distance, and security protocols.
+- **Campus Culture Readiness:** Independence, self-directed study, peer pressure management, and budgeting daily allowances.
+- **Parent-Student Dynamic:** Navigating parental transition from direct control to guided autonomy.
+
+### 2. 🎓 Post-Campus & Early Career Transition
+- **Post-Graduation Mindset:** Handling the post-university transition, managing family expectations, and setting 6-month milestones.
+- **ATS-Optimized Resumes & Portfolios:** Tailoring CVs to pass corporate Applicant Tracking Systems with impact metrics.
+- **Interview Mastery & Job Hunting:** Hidden job markets, cold outreach, and STAR behavioral interview practice.
+- **Financial Literacy & Independence:** Budgeting frameworks (50/30/20), managing HELB loan repayments, and introductory investments (Money Market Funds, SACCOs, emergency buffers).
+- **Postgraduate & Scholarships:** Sourcing and applying for local and international postgraduate opportunities.
+
+### 3. 💼 Career Guidance, Growth & Pivots
+- **Ikigai Alignment:** Discovering the intersection of passion, innate strengths, societal impact, and financial viability.
+- **Workplace Dynamics:** Corporate communication, office politics, performance reviews, and managing up.
+- **Career Pivots:** Transitioning into high-growth sectors (Tech, Finance, Agribusiness) without starting from scratch.
+- **Income Diversification & Side Gigs:** Setting freelance consulting rates and building complementary skills ethically.
+- **Burnout & Career Resets:** Formulating safe exit strategies from toxic environments and rebuilding confidence.
+
+---
+
+## 🛠️ Technology Stack
+
+- **Client Runtime:** [Expo SDK 57](https://expo.dev) with [React Native 0.86.3](https://reactnative.dev) & React 19
+- **Navigation:** [Expo Router v57](https://docs.expo.dev/router/introduction) (Dynamic tab-based & modal routing with role guards)
+- **Backend & Database:** [Supabase](https://supabase.com) (PostgreSQL, Supabase Auth, Row Level Security, Realtime, Storage)
+- **Animations:** `react-native-reanimated` 4.5, `expo-linear-gradient`, `expo-haptics`
+- **Calendar & Form Controls:** `react-native-calendars`, `@react-native-community/datetimepicker`
+- **Security & Storage:** `expo-secure-store`, `@react-native-async-storage/async-storage`
+- **Media & Hardware:** `expo-image-picker`, `expo-device`, `expo-splash-screen`
+
+---
+
+## 📁 Project Directory Structure
+
+```text
+nextstep-hub/
+├── assets/                       # App icons, splash screens, illustration graphics
+├── libs/                         # Core backend client setup and notification helpers
+│   ├── appointmentsReminder.js   # Appointment alert helpers
+│   ├── notifications.js          # In-app realtime notification handlers
+│   └── supabase.js               # Supabase client with SecureStore adapter
 ├── src/
-│   ├── app/                     # Screens (Expo Router)
-│   │   ├── (auth)/              # Landing, login, signup, pending & suspended screens
-│   │   ├── (client)/            # Client home, appointments, programs, profile
-│   │   ├── (counselor)/         # Counselor dashboard, appointments, programs, profile
-│   │   ├── (admin)/             # Admin dashboard, staff, pricing, programs, settings
-│   │   └── _layout.jsx          # Root layout, auth context & role guard
-│   ├── components/              # Shared components and program content data
-│   └── styles/                  # Screen stylesheets grouped by role
-├── assets/                      # Images and icons
-└── app.json                     # Expo configuration
+│   ├── app/                      # Application routes (Expo Router)
+│   │   ├── (admin)/              # Admin layout, dashboard, staff, pricing, programs
+│   │   ├── (auth)/               # Landing, login, multi-step signup, pending, suspended
+│   │   ├── (client)/             # Client home, booking flow, appointments, programs, profile
+│   │   ├── (counselor)/          # Counselor home, schedule, session actions, programs
+│   │   ├── _layout.jsx           # Root layout, Supabase session restoration & role guards
+│   │   └── index.jsx             # Cold-start mount view
+│   ├── components/               # UI components, modals, cards, skeletons
+│   │   ├── client/               # Category tiles, booking steps, program module data
+│   │   ├── counselor/            # Session rows, action modals, review cards
+│   │   ├── landing/              # Aurora blobs, shimmer buttons, rotating headlines
+│   │   └── preLoader.jsx         # Custom seedling sprout intro animation
+│   ├── context/                  # React contexts (NotificationsContext, AuthContext)
+│   ├── hooks/                    # Reusable custom hooks
+│   ├── services/                 # Email templates and delivery integration
+│   └── styles/                   # Role-grouped UI stylesheets
+├── app.json                      # Expo application manifest & plugin configuration
+├── package.json                  # Dependencies and execution scripts
+├── tsconfig.json                 # TypeScript compiler paths and aliases
+└── LICENSE                       # Proprietary All Rights Reserved License
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Internal Developer Setup
 
-### Prerequisites
+This section is strictly for authorized developers and contractors assigned by **desolNurturers**.
 
-- [Node.js](https://nodejs.org) 20.19 or newer
-- npm
-- A [Supabase](https://supabase.com) project
-- [Expo Go](https://expo.dev/go) on your phone, or an Android emulator / iOS simulator
+### 1. Prerequisites
+- [Node.js](https://nodejs.org) (v20.19.0 or higher)
+- [Git](https://git-scm.com)
+- Active credentials to the official **desolNurturers** Supabase organization
 
-### 1. Clone and install
-
+### 2. Installation
 ```bash
-git clone https://github.com/<your-username>/nextstep-hub.git
+git clone <authorized-private-repo-url>
 cd nextstep-hub
 npm install
 ```
 
-### 2. Configure environment variables
-
-Create a `.env` file in the project root:
+### 3. Environment Variables
+Create a local `.env` file in the root directory:
 
 ```env
-EXPO_PUBLIC_SUPABASE_URL=your-supabase-project-url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-public-key
+EXPO_PUBLIC_EMAIL_SERVICE_URL=https://your-email-service.com/send
 ```
 
-> ⚠️ Never commit your `.env` file. It is already listed in `.gitignore`.
+> ⚠️ **Strict Non-Disclosure:** Never share, export, or publish your `.env` credentials, API tokens, or keys.
 
-### 3. Set up Supabase
+---
 
-Create the following in your Supabase project:
+## 🗄️ Database Schema Initialization (Supabase SQL)
 
-**Table: `profiles`**: one row per user (linked to the auth user ID)
+Authorized administrators setting up a staging or production instance can run the following SQL script inside the Supabase **SQL Editor**:
 
-`id`, `email`, `first_name`, `middle_name`, `surname`, `full_name`, `role`, `phone_no`, `alt_phone_no`, `gender`, `age`, `county`, `relationship_status`, `religion`, `emergency_phone`, `emergency_relationship`, `years_of_experience`, `specializations`, `about`, `avatar_url`, `approved`, `suspended`, `updated_at`
+```sql
+-- 1. Create Profiles Table (linked to Supabase Auth users)
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT UNIQUE NOT NULL,
+    first_name TEXT NOT NULL,
+    middle_name TEXT,
+    surname TEXT NOT NULL,
+    full_name TEXT,
+    role TEXT NOT NULL DEFAULT 'Client' CHECK (role IN ('Client', 'Counselor', 'Admin')),
+    phone_no TEXT,
+    alt_phone_no TEXT,
+    gender TEXT,
+    age INT,
+    county TEXT,
+    relationship_status TEXT,
+    religion TEXT,
+    emergency_phone TEXT,
+    emergency_relationship TEXT,
+    years_of_experience INT,
+    specializations TEXT[],
+    about TEXT,
+    avatar_url TEXT,
+    absent_days TEXT[] DEFAULT '{}',
+    approved BOOLEAN DEFAULT FALSE,
+    suspended BOOLEAN DEFAULT FALSE,
+    last_login_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-**Table: `staff_whitelist`**: emails pre-approved for staff roles
+-- 2. Staff Whitelist Table (Pre-approved Counselors and Admins)
+CREATE TABLE IF NOT EXISTS public.staff_whitelist (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('Counselor', 'Admin')),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-`id`, `email`, `role` (`Counselor` or `Admin`)
+-- 3. Appointments Table
+CREATE TABLE IF NOT EXISTS public.appointments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+    counselor_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+    counseling_type TEXT NOT NULL,
+    reasons TEXT[] DEFAULT '{}',
+    other_reason TEXT,
+    session_goals TEXT,
+    had_therapy_before BOOLEAN,
+    agreed_terms BOOLEAN DEFAULT TRUE,
+    session_mode TEXT DEFAULT 'online' CHECK (session_mode IN ('online', 'phone')),
+    client_call_phone TEXT,
+    session_link TEXT,
+    scheduled_start_time TIMESTAMPTZ NOT NULL,
+    scheduled_end_time TIMESTAMPTZ NOT NULL,
+    duration_minutes INT DEFAULT 50,
+    status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled_by_client', 'cancelled_by_counselor', 'rescheduled', 'rescheduled_requested', 'no_show', 'pending_payment')),
+    payment_status TEXT DEFAULT 'completed',
+    payment_amount NUMERIC(10,2) DEFAULT 0.00,
+    currency TEXT DEFAULT 'KES',
+    mpesa_transaction_reference TEXT,
+    notes TEXT,
+    action_reason TEXT,
+    action_by_role TEXT,
+    action_at TIMESTAMPTZ,
+    reminder_24h_sent BOOLEAN DEFAULT FALSE,
+    reminder_1h_sent BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-**Storage bucket: `avatars`**: public bucket for profile pictures, with policies letting users upload into their own `<user-id>/` folder.
+-- 4. Appointment Reviews & Clinical Notes Table
+CREATE TABLE IF NOT EXISTS public.appointment_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    appointment_id UUID NOT NULL REFERENCES public.appointments(id) ON DELETE CASCADE,
+    reviewer_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    reviewer_role TEXT NOT NULL CHECK (reviewer_role IN ('client', 'counselor', 'admin')),
+    rating INT CHECK (rating >= 1 AND rating <= 5),
+    feedback_text TEXT,
+    counselor_notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-Enable Row Level Security and add policies appropriate to each role.
+-- 5. Programs & Workshops Table
+CREATE TABLE IF NOT EXISTS public.programs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    category TEXT,
+    description TEXT,
+    starts_at TIMESTAMPTZ NOT NULL,
+    location_type TEXT DEFAULT 'virtual' CHECK (location_type IN ('virtual', 'physical', 'phone')),
+    location_details TEXT,
+    is_paid BOOLEAN DEFAULT FALSE,
+    amount NUMERIC(10,2) DEFAULT 0.00,
+    currency TEXT DEFAULT 'KES',
+    poster_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-> 💡 **Creating the first admin:** add your email to `staff_whitelist` with the role `Admin`, sign up in the app, then set `approved = true` on your row in `profiles`.
+-- 6. Program Registrations Table
+CREATE TABLE IF NOT EXISTS public.program_participants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    program_id UUID NOT NULL REFERENCES public.programs(id) ON DELETE CASCADE,
+    client_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'registered' CHECK (status IN ('registered', 'attended', 'cancelled')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(program_id, client_id)
+);
 
-### 4. Run the app
+-- 7. In-App Realtime Notifications Table
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    data JSONB DEFAULT '{}'::jsonb,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 8. Platform System Settings Table
+CREATE TABLE IF NOT EXISTS public.system_settings (
+    key TEXT PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Default appointment pricing
+INSERT INTO public.system_settings (key, value)
+VALUES ('session_pricing', '{"amount": 2500, "currency": "KES"}'::jsonb)
+ON CONFLICT (key) DO NOTHING;
+
+-- 9. Storage Bucket: Avatars
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+```
+
+---
+
+## 📱 Development & Testing Commands
 
 ```bash
+# Start local development server
 npx expo start
-```
 
-Then press `a` for Android, `i` for iOS, `w` for web, or scan the QR code with Expo Go.
+# Run on Android handset or emulator
+npx expo start --android
+
+# Run on iOS simulator
+npx expo start --ios
+
+# Run in web browser
+npx expo start --web
+```
 
 ---
 
-## 📦 Building for Release
-
-The app uses [EAS Build](https://docs.expo.dev/build/introduction/).
+## 📦 Production Deployment (EAS Build)
 
 ```bash
+# Install EAS CLI globally
 npm install -g eas-cli
+
+# Login to authorized desolNurturers Expo organization
 eas login
+
+# Build production Android App Bundle (AAB for Google Play Console)
 eas build --platform android --profile production
+
+# Build preview APK for internal device testing
+eas build --platform android --profile preview
 ```
 
-Upload the generated `.aab` file to the Google Play Console.
+---
+
+## 🔒 Confidentiality & Crisis Notice
+
+- **Kenya Data Protection Act, 2019:** All client records, clinical notes, and user data are strictly confidential.
+- **Crisis Helpline Notice:** NextStep Hub is a counseling and mentorship platform, **not an emergency psychiatric or medical intervention service**. Users in acute emotional distress or immediate danger must contact local emergency services or the Kenya Red Cross hotline (**1199**).
 
 ---
 
-## 🧭 Roadmap
+## ⚖️ Legal & Copyright Enforcement
 
-- [ ] Live M-Pesa payment integration (the payment step is currently simulated)
-- [ ] Connect appointments, programs and reviews to the Supabase database (some screens use sample data)
-- [ ] Push notifications for reminders and approvals
-- [ ] In-app chat between clients and counselors
-- [ ] Automated Google Meet link generation
-- [ ] Swahili language support
+```text
+Copyright © 2026 desolNurturers. All Rights Reserved.
+Founder & Principal: Counselor Lucy
+Headquarters: Nairobi, Kenya
 
----
+Protected under:
+- The Copyright Act (Cap. 130 of the Laws of Kenya)
+- The Industrial Property Act of Kenya
+- The Berne Convention for the Protection of Literary and Artistic Works
+- The WIPO Copyright Treaty (WCT)
+```
 
-## ⚠️ Important Notice
-
-NextStep Hub provides mentorship and counseling support but **is not an emergency service**. If you or someone you know is in immediate danger or crisis, please contact your local emergency services or a crisis helpline right away.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit your changes: `git commit -m "Add your feature"`
-4. Push the branch: `git push origin feature/your-feature`
-5. Open a Pull Request
-
----
-
-## 📬 Support
-
-Questions or issues? Email **support@nextstep.org** or open an issue on GitHub.
-
----
-
-## 📄 License
-
-Add your chosen license here (for example, MIT) and include a `LICENSE` file in the repository.
+For authorized business discussions, institutional partnerships, or legal inquiries, contact:
+**desolNurturers / Counselor Lucy Project**  
+Email: **legal@nextstep.org** / **info@nextstep.org**
 
 ---
 
 <div align="center">
 
-Made with 💚 by **desolNurturers** to help young people take their next step with confidence.
+**NextStep Hub** • *Step Confidently Into Your Next Chapter*  
+**Proprietary Software — desolNurturers (Counselor Lucy)**  
+*All Rights Reserved. Unauthorized duplication is strictly prohibited.*
 
 </div>
 
----
-
 <!---
-
 # 📱 Google Play Store Listing Copy
+Ready to copy and paste directly into Google Play Console:
 
-*Ready to paste into the Play Console.*
-
-### App name (max 30 characters)
-```
+### App Name (max 30 characters)
 NextStep Hub: Youth Mentorship
-```
 
-### Short description (max 80 characters)
-```
-Book private mentorship & counseling from high school to campus to career.
-```
+### Short Description (max 80 characters)
+Book private mentorship & counseling from high school to campus to your career.
 
-### Full description (max 4000 characters)
-
-```
+### Full Description (max 4000 characters)
 Step confidently into your next chapter with NextStep Hub.
 
-NextStep Hub connects young people with trusted mentors and counselors who guide you through life's biggest transitions: from high school to university, through campus life, and into your career.
+NextStep Hub connects young people with trusted, verified mentors and counselors who guide you through life's biggest transitions: from high school exit and university admission, through campus life, and into the professional workplace.
 
-🎓 GUIDANCE FOR EVERY STAGE
-• Pre-Campus: course selection, KUCCPS application support, hostel tips, campus readiness, study skills and budgeting
-• Post-Campus: CV building, job search and interview prep, scholarships, entrepreneurship and financial independence
-• Career Guidance: discover your strengths, pivot careers, grow into leadership and find purpose in your work
+🎓 GUIDANCE FOR EVERY MAJOR MILESTONE:
+• Pre-Campus: KUCCPS portal navigation, cluster point calculations, course selection, hostel safety checklist, budgeting pocket money, and campus readiness.
+• Post-Campus: Graduation mindset, CV and portfolio building for ATS systems, interview preparation, managing student loans (HELB), and introductory financial literacy (Money Market Funds & budgeting).
+• Career Mentorship: Discover your strengths (Ikigai), explore high-demand industries, pivot careers smoothly, and build workplace confidence.
 
-📅 BOOK IN MINUTES
-Choose the type of session that fits you (Individual, Group, Couple, Family, Student or Teen), share what you'd like to work on, pick your counselor, and select a time that suits you. Sessions are held online through video call, so you can join from anywhere.
+📅 BOOK PRIVATE VIRTUAL SESSIONS:
+Choose the counseling format that fits your needs (Individual, Student, Teen, Career, or Family guidance), share your goals, select your mentor, and pick a convenient date and time. Sessions are held confidentially via online video call or phone call.
 
-💬 SUPPORT THAT'S PERSONAL
-• Talk about career, relationships, family, finances, mental health and campus life
-• Manage, reschedule or cancel your appointments easily
-• Leave feedback after each session
+💬 SUPPORT DESIGNED FOR YOU:
+• Talk through academic stress, career choices, relationships, campus life, and personal wellness.
+• Easily reschedule, postpone, or manage your bookings in one central place.
+• Receive session summaries and verified clinical notes.
 
-🔒 PRIVATE AND SECURE
-• Your information is handled in line with Kenya's Data Protection Act, 2019
-• Sessions are confidential
-• Secure sign-in and role-based access
+🔒 PRIVATE & CONFIDENTIAL:
+• Your personal information is handled in strict compliance with Kenya's Data Protection Act, 2019.
+• Sessions remain private and confidential.
+• Secure token authentication and encrypted device storage.
 
-👩‍🏫 FOR COUNSELORS AND ADMINS
-Counselors can manage sessions, set availability, run programs and view client feedback. Admins can approve staff, manage pricing and oversee the platform.
+👩‍🏫 FOR COUNSELORS & MENTORS:
+Verified counselors can set flexible working days, block absent dates, manage intake notes, and host virtual sessions with young Kenyans nationwide.
 
-Download NextStep Hub today and take your next step with confidence.
+Download NextStep Hub today and take your next step with clarity and confidence.
 
-Note: NextStep Hub is not an emergency service. If you are in crisis or immediate danger, please contact your local emergency services.
-```
-
-### Suggested category & tags
-- **Category:** Education (alternative: Lifestyle)
-- **Tags:** mentorship, counseling, career guidance, student, youth, university, jobs
-- **Contact email:** support@nextstep.org
-
-### Store assets checklist
-- [ ] App icon: 512 × 512 PNG
-- [ ] Feature graphic: 1024 × 500 PNG
-- [ ] At least 4 phone screenshots (suggested: Home, Programs, Booking flow, Appointments)
-- [ ] Privacy Policy URL (required, especially since the app collects personal data)
-- [ ] Data safety form: declare email, name, phone number, age, location (county), profile photo and emergency contact
-- [ ] Content rating questionnaire
-
+Disclaimer: NextStep Hub provides guidance, life coaching, and counseling support. It is not an emergency psychiatric or medical intervention service. If you or someone you know is in immediate crisis, please contact local emergency hotlines immediately.
 -->
