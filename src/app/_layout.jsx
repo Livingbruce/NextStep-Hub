@@ -12,13 +12,10 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { setupLocalNotifications } from "../../libs/localNotifications";
+import { cancelAppointmentReminders, setupLocalNotifications } from "../../libs/localNotifications";
 import { supabase } from "../../libs/supabase";
 import Preloader from "../components/preLoader";
-import {
-  cancelAppointmentReminders,
-  NotificationsProvider,
-} from "../context/NotificationsContext";
+import { NotificationsProvider } from "../context/NotificationsContext";
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 150, fade: true });
