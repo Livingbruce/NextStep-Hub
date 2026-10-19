@@ -3,9 +3,10 @@
 # 🌱 NextStep Hub
 
 ### Step Confidently Into Your Next Chapter.
+
 **Proprietary Virtual Mentorship and Counseling Platform for Kenyan Youth**
 
-*Exclusively Owned and Commissioned by **desolNurturers** • Founded & Directed by **Counselor Lucy***
+\*Exclusively Owned and Commissioned by **desolNurturers** • Founded & Directed by **Lucy Ngutiku Muguna\***
 
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary%20%7C%20All%20Rights%20Reserved-red.svg?style=for-the-badge)](./LICENSE)
 [![Jurisdiction](https://img.shields.io/badge/Jurisdiction-Republic%20of%20Kenya-darkgreen?style=for-the-badge)](https://kenyalaw.org)
@@ -19,8 +20,9 @@
 ---
 
 > ### ⚠️ PROPRIETARY & CONFIDENTIAL LEGAL WARNING
-> **This software, source code, design architecture, workflows, and localized mentorship content are the exclusive, proprietary intellectual property of desolNurturers (Nairobi, Kenya), founded and owned by Counselor Lucy.**
-> 
+>
+> **This software, source code, design architecture, workflows, and localized mentorship content are the exclusive, proprietary intellectual property of desolNurturers (Nairobi, Kenya), founded and owned by Lucy Ngutiku Muguna.**
+>
 > **THIS IS NOT OPEN-SOURCE, CHARITY, OR PUBLIC-DOMAIN SOFTWARE.**  
 > Any unauthorized copying, cloning, decompilation, distribution, reverse engineering, publication, hosting on unauthorized servers, or commercial exploitation of this application—in whole or in part—is strictly prohibited and constitutes an immediate violation of the **Copyright Act (Cap. 130 of the Laws of Kenya)** and international copyright treaties. Violators will face immediate ex-parte injunctions, commercial damages claims, and criminal prosecution.
 
@@ -28,7 +30,7 @@
 
 ## 📖 About NextStep Hub
 
-**NextStep Hub** is a commercial digital health, coaching, and psychological counseling mobile platform developed specifically for **desolNurturers**. Built under the clinical and professional guidance of **Counselor Lucy**, the platform addresses the high-anxiety transition periods faced by Kenyan youth: from high school exit and university admissions via KUCCPS to campus life, graduation, HELB debt management, and career advancement.
+**NextStep Hub** is a commercial digital health, coaching, and psychological counseling mobile platform developed specifically for **desolNurturers**. Built under the clinical and professional guidance of **Lucy Ngutiku Muguna**, the platform addresses the high-anxiety transition periods faced by Kenyan youth: from high school exit and university admissions via KUCCPS to campus life, graduation, HELB debt management, and career advancement.
 
 ---
 
@@ -36,11 +38,11 @@
 
 NextStep Hub enforces strict role-based routing and access segregation:
 
-| Role | Target Demographic | Authorized Actions |
-| :--- | :--- | :--- |
-| 🎓 **Client** | High school graduates, university/TVET students, job seekers | Browse structured guidance tracks, book private 1-on-1 virtual or phone counseling sessions, register for workshops, submit session feedback, and manage personal profile & emergency contact records. |
-| 🧑‍🏫 **Counselor** | Whitelisted therapists & certified mentors | Review assigned sessions, manage work schedule & block absent days, generate and attach virtual room links (Google Meet / Zoom), record clinical session notes, and track client reviews. |
-| 🛡️ **Admin** | desolNurturers directors & supervisory staff | Manage counselor and admin whitelist registries, approve/suspend staff accounts, configure standard session pricing (KES), manage program schedules, and inspect global audit logs. |
+| Role             | Target Demographic                                           | Authorized Actions                                                                                                                                                                                     |
+| :--------------- | :----------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎓 **Client**    | High school graduates, university/TVET students, job seekers | Browse structured guidance tracks, book private 1-on-1 virtual or phone counseling sessions, register for workshops, submit session feedback, and manage personal profile & emergency contact records. |
+| 🧑‍🏫 **Counselor** | Whitelisted therapists & certified mentors                   | Review assigned sessions, manage work schedule & block absent days, generate and attach virtual room links (Google Meet / Zoom), record clinical session notes, and track client reviews.              |
+| 🛡️ **Admin**     | desolNurturers directors & supervisory staff                 | Manage counselor and admin whitelist registries, approve/suspend staff accounts, configure standard session pricing (KES), manage program schedules, and inspect global audit logs.                    |
 
 ---
 
@@ -49,6 +51,7 @@ NextStep Hub enforces strict role-based routing and access segregation:
 The application comes pre-loaded with proprietary guidance modules created for the Kenyan educational and economic context:
 
 ### 1. 🏫 Pre-Campus Guidance (High School to University)
+
 - **KUCCPS Placement & Cluster Points:** Calculating cluster points, cut-off revision strategies, and Inter-University Transfer (IUT) procedures.
 - **Course vs. Career Alignment:** Mapping degree programs against actual Kenyan industry demand.
 - **Hostel & Security Vetting:** Assessing on-campus vs. off-campus accommodation, sanitation, distance, and security protocols.
@@ -56,6 +59,7 @@ The application comes pre-loaded with proprietary guidance modules created for t
 - **Parent-Student Dynamic:** Navigating parental transition from direct control to guided autonomy.
 
 ### 2. 🎓 Post-Campus & Early Career Transition
+
 - **Post-Graduation Mindset:** Handling the post-university transition, managing family expectations, and setting 6-month milestones.
 - **ATS-Optimized Resumes & Portfolios:** Tailoring CVs to pass corporate Applicant Tracking Systems with impact metrics.
 - **Interview Mastery & Job Hunting:** Hidden job markets, cold outreach, and STAR behavioral interview practice.
@@ -63,6 +67,7 @@ The application comes pre-loaded with proprietary guidance modules created for t
 - **Postgraduate & Scholarships:** Sourcing and applying for local and international postgraduate opportunities.
 
 ### 3. 💼 Career Guidance, Growth & Pivots
+
 - **Ikigai Alignment:** Discovering the intersection of passion, innate strengths, societal impact, and financial viability.
 - **Workplace Dynamics:** Corporate communication, office politics, performance reviews, and managing up.
 - **Career Pivots:** Transitioning into high-growth sectors (Tech, Finance, Agribusiness) without starting from scratch.
@@ -122,11 +127,13 @@ nextstep-hub/
 This section is strictly for authorized developers and contractors assigned by **desolNurturers**.
 
 ### 1. Prerequisites
+
 - [Node.js](https://nodejs.org) (v20.19.0 or higher)
 - [Git](https://git-scm.com)
 - Active credentials to the official **desolNurturers** Supabase organization
 
 ### 2. Installation
+
 ```bash
 git clone <authorized-private-repo-url>
 cd nextstep-hub
@@ -134,6 +141,7 @@ npm install
 ```
 
 ### 3. Environment Variables
+
 Create a local `.env` file in the root directory:
 
 ```env
@@ -286,7 +294,7 @@ VALUES ('session_pricing', '{"amount": 2500, "currency": "KES"}'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 -- 9. Storage Bucket: Avatars
-INSERT INTO storage.buckets (id, name, public) 
+INSERT INTO storage.buckets (id, name, public)
 VALUES ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
 ```
@@ -340,7 +348,7 @@ eas build --platform android --profile preview
 
 ```text
 Copyright © 2026 desolNurturers. All Rights Reserved.
-Founder & Principal: Counselor Lucy
+Founder & Principal: Lucy Ngutiku Muguna
 Headquarters: Nairobi, Kenya
 
 Protected under:
@@ -351,16 +359,16 @@ Protected under:
 ```
 
 For authorized business discussions, institutional partnerships, or legal inquiries, contact:
-**desolNurturers / Counselor Lucy Project**  
-Email: **legal@nextstep.org** / **info@nextstep.org**
+**desolNurturers**  
+Email: **nstephub@gmail.com**
 
 ---
 
 <div align="center">
 
-**NextStep Hub** • *Step Confidently Into Your Next Chapter*  
-**Proprietary Software — desolNurturers (Counselor Lucy)**  
-*All Rights Reserved. Unauthorized duplication is strictly prohibited.*
+**NextStep Hub** • _Step Confidently Into Your Next Chapter_  
+**Proprietary Software — desolNurturers (Lucy Ngutiku Muguna)**  
+_All Rights Reserved. Unauthorized duplication is strictly prohibited._
 
 </div>
 
