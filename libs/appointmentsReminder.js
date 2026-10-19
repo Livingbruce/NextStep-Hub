@@ -1,9 +1,12 @@
+import { scheduleAppointmentReminders } from "./localNotifications";
 import { createNotification, NOTIFICATION_TYPES } from "./notifications";
 import { supabase } from "./supabase";
 
 // Call on dashboard mount/focus for both client and counselor.
 export async function checkAppointmentReminders() {
   try {
+    await scheduleAppointmentReminders();
+
     const now = new Date();
     const in1h = new Date(now.getTime() + 60 * 60 * 1000);
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);

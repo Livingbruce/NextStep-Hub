@@ -5,6 +5,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { showNotificationNow } from "../../libs/localNotifications";
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -45,6 +46,13 @@ export function NotificationsProvider({ userId, children }) {
       setNotifications((prev) =>
         prev.some((x) => x.id === n.id) ? prev : [n, ...prev],
       );
+      if (!n.type?.startsWith("appointment_reminder")) {
+        showNotificationNow({
+          title: n.title,
+          body: n.body,
+          data: { type: n.type },
+        });
+      }
     });
 
     return () => {

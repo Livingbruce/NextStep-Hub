@@ -186,44 +186,31 @@ export default function StaffManagement() {
   };
 
   const handleRemove = (item) => {
-    Alert.alert(
-      "Remove Staff Entry",
-      `Are you sure you want to remove ${item.email}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              if (item.hasAccount) {
-                const { error: profErr } = await supabase
-                  .from("profiles")
-                  .delete()
-                  .eq("id", item.id);
-                if (profErr) throw profErr;
-
-                await supabase
-                  .from("staff_whitelist")
-                  .delete()
-                  .eq("email", item.email.toLowerCase());
-              } else {
-                const { error: wlErr } = await supabase
-                  .from("staff_whitelist")
-                  .delete()
-                  .eq("id", item.whitelistId);
-                if (wlErr) throw wlErr;
-              }
-
-              Alert.alert("Removed", "Staff record removed successfully.");
-              fetchStaffData();
-            } catch (err) {
-              Alert.alert("Error Removing", err.message);
+    Alert.alert("Remove Staff", `Deactivate ${item.email}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Deactivate",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            if (item.hasAccount) {
+              const { error } = await supabase
+                .from("profiles")
+                .update({ approved: false, suspended: true })
+                .eq("id", item.id);
+              if (error) throw error;
             }
-          },
+            await supabase
+              .from("staff_whitelist")
+              .delete()
+              .eq("email", item.email.toLowerCase());
+            fetchStaffData();
+          } catch (err) {
+            Alert.alert("Error", err.message);
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const filteredStaff = staffList.filter(

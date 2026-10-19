@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   Slot,
   useRootNavigationState,
@@ -7,19 +6,21 @@ import {
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { createContext, useContext, useEffect, useState } from "react";
+import { setupLocalNotifications } from "../../libs/localNotifications";
 import { supabase } from "../../libs/supabase";
 import Preloader from "../components/preLoader";
 import { NotificationsProvider } from "../context/NotificationsContext";
 
 SplashScreen.preventAutoHideAsync();
 
-const SESSION_KEY = "nsm_session_user";
+useEffect(() => {
+  setupLocalNotifications().catch(() => {});
+}, []);
 
 // Global cache to prevent session restoration from re-running on re-mounts
 let cachedUser = null;
 let isSessionRestoredGlobal = false;
 let hasPreloaderFinishedGlobally = false;
-let restorationPromise = null;
 
 const AuthContext = createContext({
   user: null,
@@ -42,72 +43,144 @@ export default function RootLayout() {
   const router = useRouter();
   const navigationState = useRootNavigationState();
 
-  useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
-
-  // 1. Restore local session globally (runs only once per app lifecycle)
-  useEffect(() => {
-    if (isSessionRestoredGlobal) return;
-
-    if (!restorationPromise) {
-      restorationPromise = (async () => {
-        try {
-          const stored = await AsyncStorage.getItem(SESSION_KEY);
-          if (!stored) return null;
-
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-
-          if (!session) {
-            await AsyncStorage.removeItem(SESSION_KEY);
-            return null;
-          }
-
-          const fresh = await fetchFreshStatus(JSON.parse(stored));
-          await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
-          return fresh;
-        } catch (err) {
-          console.warn("Failed to restore session:", err);
-          return null;
-        }
-      })();
-    }
-
-    restorationPromise.then((freshUser) => {
-      cachedUser = freshUser;
-      isSessionRestoredGlobal = true;
-      setUser(freshUser);
-      setIsSessionRestored(true);
-    });
-  }, []);
-
-  // 2. Fetch fresh database flags (approved, suspended)
-  const fetchFreshStatus = async (currentUser) => {
-    if (!currentUser?.id) return currentUser;
+  // Helper to fetch profile data from Supabase
+  const fetchUserProfile = async (authUser) => {
+    if (!authUser) return null;
 
     try {
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("approved, suspended")
-        .eq("id", currentUser.id)
+        .select("*")
+        .eq("id", authUser.id)
         .single();
 
-      if (error || !profile) return currentUser;
+      if (error || !profile) {
+        return {
+          id: authUser.id,
+          email: authUser.email,
+          ...authUser.user_metadata,
+        };
+      }
 
       return {
-        ...currentUser,
+        id: authUser.id,
+        email: authUser.email,
+        role: profile.role,
         approved: profile.approved,
         suspended: profile.suspended,
+        ...profile,
       };
     } catch (err) {
       console.warn("Error fetching profile status:", err);
-      return currentUser;
+      return null;
     }
   };
 
-  // 3. Status & Role Guard (runs once preloader is done)
+  // 1. Restore session via Supabase and listen to auth changes (token expiry, external sign-outs)
+  useEffect(() => {
+    let isMounted = true;
+
+    const initSession = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.user) {
+          const profileUser = await fetchUserProfile(session.user);
+          if (isMounted) {
+            cachedUser = profileUser;
+            setUser(profileUser);
+          }
+        } else {
+          if (isMounted) {
+            cachedUser = null;
+            setUser(null);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to restore session:", err);
+      } finally {
+        if (isMounted) {
+          isSessionRestoredGlobal = true;
+          setIsSessionRestored(true);
+        }
+      }
+    };
+
+    if (!isSessionRestoredGlobal) {
+      initSession();
+    } else {
+      setIsSessionRestored(true);
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        cachedUser = null;
+        if (isMounted) setUser(null);
+      } else if (
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "USER_UPDATED"
+      ) {
+        const profileUser = await fetchUserProfile(session.user);
+        if (isMounted) {
+          cachedUser = profileUser;
+          setUser(profileUser);
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  // 2. Real-time updates for approval, suspension, or role changes
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const ch = supabase
+      .channel(`profile-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        (p) => {
+          const updated = p.new;
+          setUser(
+            (u) =>
+              u && {
+                ...u,
+                approved: updated.approved,
+                suspended: updated.suspended,
+                role: updated.role,
+              },
+          );
+
+          // Force immediate redirect if suspended or unapproved dynamically
+          if (updated.suspended) {
+            router.replace("/(auth)/suspendedScreen");
+          } else if (!updated.approved) {
+            router.replace("/(auth)/pendingApproval");
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [user?.id, router]);
+
+  // 3. Status & Role Guard: Executes as soon as session is restored and navigation is ready.
   useEffect(() => {
     if (!isPreloaderDone) return;
     if (!navigationState?.key) return;
@@ -146,49 +219,49 @@ export default function RootLayout() {
     } else if (role === "admin" && segments[0] !== "(admin)") {
       router.replace("/(admin)");
     }
-  }, [user, segments, isPreloaderDone, navigationState?.key]);
+  }, [user, segments, isPreloaderDone, navigationState?.key, router]);
 
   const login = async (email, role, profile = null) => {
-    let base = {
+    const fullUser = {
       id: profile?.id,
       email,
-      role,
-      profile,
+      role: role || profile?.role,
       approved: profile?.approved,
       suspended: profile?.suspended,
+      ...profile,
     };
-
-    const sessionUser = await fetchFreshStatus(base);
-    cachedUser = sessionUser;
-    setUser(sessionUser);
-
-    try {
-      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-    } catch (err) {
-      console.warn("Failed to persist session:", err);
-    }
+    cachedUser = fullUser;
+    setUser(fullUser);
   };
 
   const logout = async () => {
     cachedUser = null;
     setUser(null);
     try {
-      await AsyncStorage.removeItem(SESSION_KEY);
+      await cancelAppointmentReminders().catch(() => {});
+
       await supabase.auth.signOut();
+      router.replace("/(auth)/landing");
     } catch (err) {
       console.warn("Failed to clear session:", err);
     }
   };
 
   const checkStatus = async () => {
-    if (!user) return;
-    const fresh = await fetchFreshStatus(user);
-    cachedUser = fresh;
-    setUser(fresh);
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
+    if (!user) return null;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.user) {
+      const fresh = await fetchUserProfile(session.user);
+      cachedUser = fresh;
+      setUser(fresh);
+      return fresh;
+    }
+    return null;
   };
 
-  // Show preloader until session check is complete AND animation finishes
+  // Show preloader conditionally until session check is complete AND animation finishes
   if (!isPreloaderDone) {
     return (
       <Preloader

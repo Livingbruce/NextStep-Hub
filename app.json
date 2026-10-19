@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.living_bruce.NSMentorship"
     },
     "web": {
       "bundler": "metro",
@@ -29,17 +30,32 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/images/icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
           "backgroundColor": "#090D16"
         }
       ],
       "@react-native-community/datetimepicker",
       "expo-secure-store",
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#16A34A"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "97c4eaf1-5622-45b1-859d-9f558a50ef07"
+      }
     }
   }
 }

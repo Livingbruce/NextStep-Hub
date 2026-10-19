@@ -1,5 +1,7 @@
+// File: preLoader.jsx
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import * as SplashScreen from "expo-splash-screen";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, {
   Easing,
@@ -14,20 +16,20 @@ import Animated, {
 } from "react-native-reanimated";
 
 const T = {
-  nsmIn: 500, // "NSM" flickers on in the dark
-  light: 1100, // glow + rays illuminate the darkness
-  expand: 2100, // NSM -> NextStep Mentorship
-  seed: 2700, // a seed drops
-  stem: 3200, // it sprouts
-  leaves: 3750, // two leaves unfurl
-  shrink: 4700, // NextStep Mentorship -> NSM
+  nsmIn: 500,
+  light: 1100,
+  expand: 2100,
+  seed: 2700,
+  stem: 3200,
+  leaves: 3750,
+  shrink: 4700,
 };
 const EXPAND_MS = 1100;
 const SHRINK_MS = 800;
-const MIN_DISPLAY_MS = 5800; // total time before the preloader may exit
+const MIN_DISPLAY_MS = 5800;
 const EXIT_MS = 450;
 
-const BG = "#090D16"; // matches the native splash color, so the hand-off is seamless
+const BG = "#090D16";
 const RAY_COUNT = 14;
 
 const MOTES = [
@@ -43,8 +45,6 @@ const MOTES = [
   { x: 0.58, y: 0.9, s: 3, d: 1400 },
 ];
 
-/* ------------------------------ Darkness ---------------------------- */
-
 function Fog({ size, top, left, color, drift, duration, delay = 0 }) {
   const t = useSharedValue(0);
   useEffect(() => {
@@ -58,8 +58,7 @@ function Fog({ size, top, left, color, drift, duration, delay = 0 }) {
         ),
       ),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [delay, duration, t]);
   const style = useAnimatedStyle(() => ({
     transform: [
       { translateX: (t.get() - 0.5) * 2 * drift },
@@ -85,7 +84,6 @@ function Fog({ size, top, left, color, drift, duration, delay = 0 }) {
   );
 }
 
-// Dust that barely exists in the dark, then glints once the light arrives.
 function Mote({ x, y, size, delay, width, height, light }) {
   const t = useSharedValue(0);
   useEffect(() => {
@@ -99,8 +97,7 @@ function Mote({ x, y, size, delay, width, height, light }) {
         ),
       ),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [delay, t]);
   const style = useAnimatedStyle(() => ({
     opacity: interpolate(t.get(), [0, 1], [0.04, 0.22 + 0.4 * light.get()]),
     transform: [
@@ -125,8 +122,6 @@ function Mote({ x, y, size, delay, width, height, light }) {
     />
   );
 }
-
-/* ------------------------------- Light ------------------------------ */
 
 const GLOW_LAYERS = [
   [1, 0.03],
@@ -217,8 +212,6 @@ function Ray({ index, angle, length, thickness, alpha, light }) {
   );
 }
 
-/* ------------------------------ The text ---------------------------- */
-
 function Expander({ text, natural, progress, range, textStyle }) {
   const w = natural + 4;
   const style = useAnimatedStyle(() => {
@@ -241,8 +234,6 @@ function Spacer({ size, progress, range }) {
   }));
   return <Animated.View style={style} />;
 }
-
-/* ------------------------------ The sprout -------------------------- */
 
 function Sprout({ k, seed, stem, leafL, leafR, ring, sway }) {
   const SEED_W = 16 * k;
@@ -295,7 +286,6 @@ function Sprout({ k, seed, stem, leafL, leafR, ring, sway }) {
         swayStyle,
       ]}
     >
-      {/* expanding ring when the leaves open */}
       <Animated.View
         style={[
           {
@@ -311,7 +301,6 @@ function Sprout({ k, seed, stem, leafL, leafR, ring, sway }) {
         ]}
       />
 
-      {/* glowing ground under the seed */}
       <Animated.View
         style={[
           {
@@ -326,7 +315,6 @@ function Sprout({ k, seed, stem, leafL, leafR, ring, sway }) {
         ]}
       />
 
-      {/* stem, with the two leaves riding on its tip */}
       <Animated.View
         style={[
           {
@@ -387,7 +375,6 @@ function Sprout({ k, seed, stem, leafL, leafR, ring, sway }) {
         </Animated.View>
       </Animated.View>
 
-      {/* the seed */}
       <Animated.View
         style={[
           {
@@ -403,16 +390,13 @@ function Sprout({ k, seed, stem, leafL, leafR, ring, sway }) {
   );
 }
 
-/* -------------------------------- Screen ---------------------------- */
-
 export default function Preloader({ onFinish, isReady = true }) {
   const { width, height } = useWindowDimensions();
 
   const fontSize = Math.min(40, Math.max(22, width * 0.062));
-  const k = fontSize / 24; // scales the sprout with the text
+  const k = fontSize / 24;
   const rayReach = Math.hypot(width, height) / 2;
 
-  // Natural widths of the expanding segments (measured off-screen).
   const [natural, setNatural] = useState({ ext: 0, tep: 0, entorship: 0 });
   const measure = (key) => (e) => {
     const w = e.nativeEvent.layout.width;
@@ -424,6 +408,10 @@ export default function Preloader({ onFinish, isReady = true }) {
   useEffect(() => {
     onFinishRef.current = onFinish;
   });
+
+  const handleLayout = useCallback(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   const nsm = useSharedValue(0);
   const light = useSharedValue(0);
@@ -439,7 +427,6 @@ export default function Preloader({ onFinish, isReady = true }) {
   const exit = useSharedValue(1);
 
   useEffect(() => {
-    // NSM flickers on, as if struggling to exist in the dark.
     nsm.set(
       withDelay(
         T.nsmIn,
@@ -453,7 +440,6 @@ export default function Preloader({ onFinish, isReady = true }) {
       ),
     );
 
-    // Light arrives, then keeps breathing.
     light.set(
       withDelay(
         T.light,
@@ -478,7 +464,6 @@ export default function Preloader({ onFinish, isReady = true }) {
       ),
     );
 
-    // NSM -> NextStep Mentorship -> NSM
     expand.set(
       withDelay(
         T.expand,
@@ -498,7 +483,6 @@ export default function Preloader({ onFinish, isReady = true }) {
       ),
     );
 
-    // Seed -> stem -> two leaves
     seed.set(
       withDelay(
         T.seed,
@@ -548,10 +532,8 @@ export default function Preloader({ onFinish, isReady = true }) {
 
     const id = setTimeout(() => setIntroDone(true), MIN_DISPLAY_MS);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [nsm, light, breath, spin, expand, seed, stem, leafL, leafR, ring, sway]);
 
-  // Exit once the story has played AND the app is ready.
   useEffect(() => {
     if (!introDone || !isReady) return;
     exit.set(
@@ -559,8 +541,7 @@ export default function Preloader({ onFinish, isReady = true }) {
     );
     const id = setTimeout(() => onFinishRef.current?.(), EXIT_MS);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [introDone, isReady]);
+  }, [introDone, isReady, exit]);
 
   const rootStyle = useAnimatedStyle(() => ({ opacity: exit.get() }));
   const fogStyle = useAnimatedStyle(() => ({
@@ -586,8 +567,7 @@ export default function Preloader({ onFinish, isReady = true }) {
   const rest = { ...initial, fontWeight: "600", color: "#EDE9E0" };
 
   return (
-    <Animated.View style={[styles.root, rootStyle]}>
-      {/* 1. Darkness: slow, heavy fog and almost-invisible dust */}
+    <Animated.View onLayout={handleLayout} style={[styles.root, rootStyle]}>
       <Animated.View
         style={[StyleSheet.absoluteFill, fogStyle]}
         pointerEvents="none"
@@ -633,7 +613,6 @@ export default function Preloader({ onFinish, isReady = true }) {
         />
       ))}
 
-      {/* 2. Light: glow and rays radiating from behind NSM */}
       <View style={styles.fill} pointerEvents="none">
         <Glow
           size={Math.hypot(width, height) * 0.8}
@@ -658,7 +637,6 @@ export default function Preloader({ onFinish, isReady = true }) {
         </Animated.View>
       </View>
 
-      {/* 3. NSM / NextStep Mentorship, with the sprout growing beneath it */}
       <View style={styles.fill} pointerEvents="none">
         <View
           style={[
@@ -712,7 +690,6 @@ export default function Preloader({ onFinish, isReady = true }) {
         </View>
       </View>
 
-      {/* Off-screen measurer for the expanding segments */}
       <View style={styles.measurer} pointerEvents="none">
         <Text style={rest} onLayout={measure("ext")}>
           ext
@@ -734,28 +711,23 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
     overflow: "hidden",
   },
-
   fill: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
   },
-
   centerContainer: {
     alignItems: "center",
     justifyContent: "center",
   },
-
   row: {
     flexDirection: "row",
     alignItems: "center",
   },
-
   sproutSlot: {
     alignItems: "center",
     justifyContent: "center",
   },
-
   measurer: {
     position: "absolute",
     left: 0,

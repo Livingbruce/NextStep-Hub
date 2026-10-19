@@ -43,6 +43,8 @@ import PasswordStrength from "../../components/signup/PasswordStrength";
 import SelectChip from "../../components/signup/SelectChip";
 import StepIndicator from "../../components/signup/StepIndicator";
 import SuccessView from "../../components/signup/SuccessView";
+import { sendEmail } from "../../services/emailServer";
+import { welcomeEmail } from "../../services/emailTemplates";
 import { ACCENT, styles } from "../../styles/(auth)/signup";
 
 const SUPPORT_EMAIL = "support@nextstep.org";
