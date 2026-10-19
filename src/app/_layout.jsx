@@ -5,17 +5,42 @@ import {
   useSegments,
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { createContext, useContext, useEffect, useState } from "react";
+import { View } from "react-native";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { setupLocalNotifications } from "../../libs/localNotifications";
 import { supabase } from "../../libs/supabase";
 import Preloader from "../components/preLoader";
-import { NotificationsProvider } from "../context/NotificationsContext";
+import {
+  cancelAppointmentReminders,
+  NotificationsProvider,
+} from "../context/NotificationsContext";
 
 SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ duration: 150, fade: true });
 
-useEffect(() => {
-  setupLocalNotifications().catch(() => {});
-}, []);
+function StatusBarGuard({ show }) {
+  const insets = useSafeAreaInsets();
+  if (!show || insets.top === 0) return null;
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: insets.top,
+        backgroundColor: "#F8FAFC",
+        zIndex: 1000,
+      }}
+    />
+  );
+}
 
 // Global cache to prevent session restoration from re-running on re-mounts
 let cachedUser = null;
@@ -42,6 +67,10 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const navigationState = useRootNavigationState();
+
+  useEffect(() => {
+    setupLocalNotifications().catch(() => {});
+  }, []);
 
   // Helper to fetch profile data from Supabase
   const fetchUserProfile = async (authUser) => {
@@ -239,7 +268,6 @@ export default function RootLayout() {
     setUser(null);
     try {
       await cancelAppointmentReminders().catch(() => {});
-
       await supabase.auth.signOut();
       router.replace("/(auth)/landing");
     } catch (err) {
@@ -264,21 +292,30 @@ export default function RootLayout() {
   // Show preloader conditionally until session check is complete AND animation finishes
   if (!isPreloaderDone) {
     return (
-      <Preloader
-        isReady={isSessionRestored}
-        onFinish={() => {
-          hasPreloaderFinishedGlobally = true;
-          setIsPreloaderDone(true);
-        }}
-      />
+      <SafeAreaProvider>
+        <StatusBar style="light" translucent />
+        <Preloader
+          isReady={isSessionRestored}
+          onFinish={() => {
+            hasPreloaderFinishedGlobally = true;
+            setIsPreloaderDone(true);
+          }}
+        />
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, checkStatus }}>
-      <NotificationsProvider userId={user?.id}>
-        <Slot />
-      </NotificationsProvider>
-    </AuthContext.Provider>
+    <SafeAreaProvider>
+      <StatusBar style="dark" translucent />
+      <AuthContext.Provider value={{ user, login, logout, checkStatus }}>
+        <NotificationsProvider userId={user?.id}>
+          <View style={{ flex: 1 }}>
+            <Slot />
+            <StatusBarGuard show={segments[0] !== "(auth)"} />
+          </View>
+        </NotificationsProvider>
+      </AuthContext.Provider>
+    </SafeAreaProvider>
   );
 }
