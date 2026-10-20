@@ -1,7 +1,5 @@
-//import * as Notifications from "expo-notifications";
+import * as Notifications from "expo-notifications";
 
-/*
-// Show the pop-up even while the app is open
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -10,15 +8,13 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-*/
 
 const PREFIX = "apt-";
 
-//const hasPermission = async () =>
-// (await Notifications.getPermissionsAsync()).status === "granted";
+const hasPermission = async () =>
+  (await Notifications.getPermissionsAsync()).status === "granted";
 
 export async function setupLocalNotifications() {
-  /*
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
       name: "Default",
@@ -30,12 +26,10 @@ export async function setupLocalNotifications() {
   if (!(await hasPermission())) {
     await Notifications.requestPermissionsAsync();
   }
-    */
 }
 
 // Pop-up right now
 export async function showNotificationNow({ title, body, data }) {
-  /*
   if (!(await hasPermission())) return;
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -45,23 +39,19 @@ export async function showNotificationNow({ title, body, data }) {
     },
     trigger: Platform.OS === "android" ? { channelId: "default" } : null,
   });
-  */
 }
 
 export async function cancelAppointmentReminders() {
-  /*
   const all = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     all
       .filter((n) => n.identifier.startsWith(PREFIX))
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
-  */
 }
 
 // Schedules 24h + 1h reminders on the phone, so they fire even if the app is closed
 export async function scheduleAppointmentReminders() {
-  /*
   if (!(await hasPermission())) return;
 
   const now = Date.now();
@@ -110,5 +100,4 @@ export async function scheduleAppointmentReminders() {
       });
     }
   }
-    */
 }
