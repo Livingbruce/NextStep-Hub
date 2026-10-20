@@ -21,7 +21,7 @@ import Preloader from "../components/preLoader";
 import { NotificationsProvider } from "../context/NotificationsContext";
 
 SplashScreen.preventAutoHideAsync();
-SplashScreen.setOptions({ duration: 150, fade: true });
+//SplashScreen.setOptions({ duration: 150, fade: true });
 
 function StatusBarGuard({ show }) {
   const insets = useSafeAreaInsets();
