@@ -12,7 +12,10 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { cancelAppointmentReminders, setupLocalNotifications } from "../../libs/localNotifications";
+import {
+  cancelAppointmentReminders,
+  setupLocalNotifications,
+} from "../../libs/localNotifications";
 import { supabase } from "../../libs/supabase";
 import Preloader from "../components/preLoader";
 import { NotificationsProvider } from "../context/NotificationsContext";
@@ -58,9 +61,10 @@ export default function RootLayout() {
   const [isSessionRestored, setIsSessionRestored] = useState(
     isSessionRestoredGlobal,
   );
-  const [isPreloaderDone, setIsPreloaderDone] = useState(
+  const [isStartupDone, setIsStartupDone] = useState(
     hasPreloaderFinishedGlobally,
   );
+  const [isAppReady, setIsAppReady] = useState(hasPreloaderFinishedGlobally);
   const segments = useSegments();
   const router = useRouter();
   const navigationState = useRootNavigationState();
@@ -113,10 +117,24 @@ export default function RootLayout() {
         } = await supabase.auth.getSession();
 
         if (session?.user) {
-          const profileUser = await fetchUserProfile(session.user);
+          const profilePromise = fetchUserProfile(session.user);
+          const timeoutPromise = new Promise((resolve) =>
+            setTimeout(() => resolve(null), 2500),
+          );
+          const profileUser = await Promise.race([
+            profilePromise,
+            timeoutPromise,
+          ]);
+
+          const resolvedUser = profileUser || {
+            id: session.user.id,
+            email: session.user.email,
+            ...session.user.user_metadata,
+          };
+
           if (isMounted) {
-            cachedUser = profileUser;
-            setUser(profileUser);
+            cachedUser = resolvedUser;
+            setUser(resolvedUser);
           }
         } else {
           if (isMounted) {
@@ -206,15 +224,16 @@ export default function RootLayout() {
     };
   }, [user?.id, router]);
 
-  // 3. Status & Role Guard: Executes as soon as session is restored and navigation is ready.
+  // 3. Status & Role Guard: Executes as soon as session is restored and navigation is mounted
   useEffect(() => {
-    if (!isPreloaderDone) return;
+    if (!isSessionRestored) return;
     if (!navigationState?.key) return;
 
     if (!user) {
       if (segments[0] !== "(auth)") {
         router.replace("/(auth)/landing");
       }
+      setIsAppReady(true);
       return;
     }
 
@@ -226,6 +245,7 @@ export default function RootLayout() {
       if (currentAuthScreen !== "suspendedScreen") {
         router.replace("/(auth)/suspendedScreen");
       }
+      setIsAppReady(true);
       return;
     }
 
@@ -233,6 +253,7 @@ export default function RootLayout() {
       if (currentAuthScreen !== "pendingApproval") {
         router.replace("/(auth)/pendingApproval");
       }
+      setIsAppReady(true);
       return;
     }
 
@@ -245,7 +266,9 @@ export default function RootLayout() {
     } else if (role === "admin" && segments[0] !== "(admin)") {
       router.replace("/(admin)");
     }
-  }, [user, segments, isPreloaderDone, navigationState?.key, router]);
+
+    setIsAppReady(true);
+  }, [user, segments, isSessionRestored, navigationState?.key, router]);
 
   const login = async (email, role, profile = null) => {
     const fullUser = {
@@ -286,30 +309,27 @@ export default function RootLayout() {
     return null;
   };
 
-  // Show preloader conditionally until session check is complete AND animation finishes
-  if (!isPreloaderDone) {
-    return (
-      <SafeAreaProvider>
-        <StatusBar style="light" translucent />
-        <Preloader
-          isReady={isSessionRestored}
-          onFinish={() => {
-            hasPreloaderFinishedGlobally = true;
-            setIsPreloaderDone(true);
-          }}
-        />
-      </SafeAreaProvider>
-    );
-  }
-
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" translucent />
+      <StatusBar
+        style={!isStartupDone || segments[0] === "(auth)" ? "light" : "dark"}
+        translucent
+      />
       <AuthContext.Provider value={{ user, login, logout, checkStatus }}>
         <NotificationsProvider userId={user?.id}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: "#090D16" }}>
             <Slot />
-            <StatusBarGuard show={segments[0] !== "(auth)"} />
+            <StatusBarGuard show={segments[0] !== "(auth)" && isStartupDone} />
+
+            {!isStartupDone && (
+              <Preloader
+                isReady={isAppReady}
+                onFinish={() => {
+                  hasPreloaderFinishedGlobally = true;
+                  setIsStartupDone(true);
+                }}
+              />
+            )}
           </View>
         </NotificationsProvider>
       </AuthContext.Provider>

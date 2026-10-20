@@ -4,7 +4,7 @@
     "slug": "NSMentorship",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/logoimage.jpg",
+    "icon": "./assets/images/logoimage-removebg.png",
     "scheme": "nextstephub",
     "userInterfaceStyle": "light",
     "ios": {
@@ -23,15 +23,15 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/logoimage.jpg"
+      "favicon": "./assets/images/logoimage-removebg.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/iconlogo-removebg.png",
-          "imageWidth": 200,
+          "image": "./assets/images/logoimage-removebg.png",
+          "imageWidth": 220,
           "resizeMode": "contain",
           "backgroundColor": "#090D16"
         }
