@@ -39,6 +39,10 @@ import { getFriendlyErrorMessage } from "../../components/errorHandler";
 import AuroraBlobs from "../../components/landing/AuroraBlobs";
 import FloatingInput from "../../components/landing/floatingInput";
 import ShimmerButton from "../../components/landing/Shimmerbutton";
+import {
+  checkPassword,
+  isPasswordLeaked,
+} from "../../components/signup/passwordPolicy";
 import PasswordStrength from "../../components/signup/PasswordStrength";
 import SelectChip from "../../components/signup/SelectChip";
 import StepIndicator from "../../components/signup/StepIndicator";
@@ -311,7 +315,6 @@ export default function SignupScreen() {
       return false;
     });
     return () => sub.remove();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, done]);
 
   /* ---- form helpers ---- */
@@ -389,10 +392,10 @@ export default function SignupScreen() {
       else if (!EMAIL_REGEX.test(email))
         e.email = "That doesn't look like a valid email address.";
       if (!f.password) e.password = "Create a password.";
-      else if (f.password.length < 6) e.password = "Use at least 6 characters.";
-      if (!f.confirmPassword) e.confirmPassword = "Re-enter your password.";
-      else if (f.password !== f.confirmPassword)
-        e.confirmPassword = "Passwords don't match.";
+      else {
+        const pc = checkPassword(f.password, { email });
+        if (pc.message) e.password = pc.message;
+      }
     }
 
     if (n === 2) {
@@ -538,6 +541,19 @@ export default function SignupScreen() {
   };
 
   const handleFinalSignup = async () => {
+    const pc = checkPassword(formData.password, {
+      email: formData.email,
+      firstName: formData.firstName,
+      middleName: formData.middleName,
+      surname: formData.surname,
+    });
+    if (!pc.valid) {
+      goToStep(1, () => {
+        setErrors({ password: pc.message });
+        setFormError({ message: pc.message });
+      });
+      return;
+    }
     setLoading(true);
     const cleanEmail = formData.email.trim().toLowerCase();
     const fullName = [formData.firstName, formData.middleName, formData.surname]
@@ -553,7 +569,6 @@ export default function SignupScreen() {
       });
       if (authError) throw authError;
 
-      // With email confirmation on, Supabase hides duplicates by returning a user with no identities.
       if (
         authData?.user &&
         Array.isArray(authData.user.identities) &&
@@ -611,11 +626,19 @@ export default function SignupScreen() {
     if (step === 1) {
       setLoading(true);
       try {
+        const { leaked } = await isPasswordLeaked(formData.password);
+        if (leaked) {
+          fail({
+            password:
+              "This password has appeared in a known data breach. Please choose a different one.",
+          });
+          return;
+        }
+
         await fetchWhitelistRole(formData.email);
         goToStep(2);
       } catch (err) {
         console.error("Whitelist check error:", err);
-        // Don't silently sign a staff member up as a client.
         fail(
           {},
           "We couldn't verify your email right now. Check your internet connection and try again.",
@@ -754,7 +777,13 @@ export default function SignupScreen() {
           right: eye(showPassword, () => setShowPassword((v) => !v)),
         }),
         formData.password
-          ? item("strength", <PasswordStrength password={formData.password} />)
+          ? item(
+              "strength",
+              <PasswordStrength
+                password={formData.password}
+                email={formData.email}
+              />,
+            )
           : null,
         textField(
           "confirmPassword",

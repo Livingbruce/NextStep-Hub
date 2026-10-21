@@ -1,4 +1,6 @@
 import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+import { supabase } from "./supabase";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -28,7 +30,6 @@ export async function setupLocalNotifications() {
   }
 }
 
-// Pop-up right now
 export async function showNotificationNow({ title, body, data }) {
   if (!(await hasPermission())) return;
   await Notifications.scheduleNotificationAsync({
@@ -50,7 +51,6 @@ export async function cancelAppointmentReminders() {
   );
 }
 
-// Schedules 24h + 1h reminders on the phone, so they fire even if the app is closed
 export async function scheduleAppointmentReminders() {
   if (!(await hasPermission())) return;
 
@@ -63,7 +63,6 @@ export async function scheduleAppointmentReminders() {
     .lte("scheduled_start_time", new Date(now + 7 * 86400000).toISOString());
   if (error) return;
 
-  // Clear old ones first so cancelled/moved appointments don't still ring
   await cancelAppointmentReminders();
 
   const REMINDERS = [
