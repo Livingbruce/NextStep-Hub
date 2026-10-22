@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Image, Text, View } from "react-native";
+import { useState } from "react";
+import { Image, Modal, Text, View } from "react-native";
 import Animated, {
   FadeInDown,
   FadeOut,
@@ -39,6 +40,7 @@ export default function CounselorProgramCard({
   onViewParticipants,
   style,
 }) {
+  const [modalVisible, setModalVisible] = useState(false);
   const date = new Date(program.startsAt);
   const loc = LOCATION_TYPES.find((l) => l.value === program.locationType);
   const attended = program.participants.filter(
@@ -56,11 +58,18 @@ export default function CounselorProgramCard({
       style={[cp.card, past && cp.cardPast, style]}
     >
       {!!program.posterUrl && (
-        <Image
-          source={{ uri: program.posterUrl }}
-          style={cp.poster}
-          resizeMode="cover"
-        />
+        <PressableScale
+          onPress={(e) => {
+            e.stopPropagation?.();
+            setModalVisible(true);
+          }}
+        >
+          <Image
+            source={{ uri: program.posterUrl }}
+            style={cp.poster}
+            resizeMode="cover"
+          />
+        </PressableScale>
       )}
 
       <View style={cp.body}>
@@ -166,6 +175,50 @@ export default function CounselorProgramCard({
           </PressableScale>
         </View>
       </View>
+
+      {/* Full Screen Poster Preview Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.92)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <PressableScale
+            onPress={() => setModalVisible(false)}
+            style={{
+              position: "absolute",
+              top: 50,
+              right: 20,
+              zIndex: 10,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: "rgba(255, 255, 255, 0.2)",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="close" size={24} color="#FFFFFF" />
+          </PressableScale>
+
+          <Image
+            source={{ uri: program.posterUrl }}
+            style={{
+              width: "100%",
+              height: "85%",
+            }}
+            resizeMode="contain"
+          />
+        </View>
+      </Modal>
     </Animated.View>
   );
 }

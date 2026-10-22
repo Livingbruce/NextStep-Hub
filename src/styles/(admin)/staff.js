@@ -4,9 +4,9 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8FAFC",
+    paddingHorizontal: 20,
   },
   header: {
-    paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
   },
@@ -21,7 +21,6 @@ export const styles = StyleSheet.create({
     marginTop: 2,
   },
   whitelistSection: {
-    paddingHorizontal: 20,
     marginBottom: 16,
   },
   sectionHeader: {
@@ -133,7 +132,6 @@ export const styles = StyleSheet.create({
     fontWeight: "700",
   },
   listContent: {
-    paddingHorizontal: 20,
     paddingBottom: 30,
   },
   card: {

@@ -118,7 +118,7 @@ export default function Profile() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
-        allowsEditing: true,
+        allowsEditing: false,
         aspect: [1, 1],
         quality: 0.7,
         base64: true,
@@ -190,9 +190,6 @@ export default function Profile() {
 
       // --------------------------------------------------
       // 4. Create a unique storage path
-      //
-      // IMPORTANT:
-      // Use user.id rather than profile.id.
       // --------------------------------------------------
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
@@ -210,9 +207,6 @@ export default function Profile() {
 
       // --------------------------------------------------
       // 6. Upload to Supabase Storage
-      //
-      // upsert:false is intentional because the filename
-      // contains Date.now(), so every upload is unique.
       // --------------------------------------------------
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("avatars")
@@ -243,8 +237,6 @@ export default function Profile() {
 
       // --------------------------------------------------
       // 8. Update the user's profile
-      //
-      // Use the authenticated user's ID here as well.
       // --------------------------------------------------
       const { error: updateError } = await supabase
         .from("profiles")

@@ -230,7 +230,10 @@ export default function RootLayout() {
     if (!navigationState?.key) return;
 
     if (!user) {
-      if (segments[0] !== "(auth)") {
+      const onAuthEntry =
+        segments[0] === "(auth)" &&
+        ["landing", "login", "signup"].includes(segments[1]);
+      if (!onAuthEntry) {
         router.replace("/(auth)/landing");
       }
       setIsAppReady(true);
@@ -284,14 +287,14 @@ export default function RootLayout() {
   };
 
   const logout = async () => {
-    cachedUser = null;
-    setUser(null);
     try {
       await cancelAppointmentReminders().catch(() => {});
       await supabase.auth.signOut();
-      router.replace("/(auth)/landing");
     } catch (err) {
       console.warn("Failed to clear session:", err);
+    } finally {
+      cachedUser = null;
+      setUser(null);
     }
   };
 

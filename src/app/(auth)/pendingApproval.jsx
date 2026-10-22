@@ -17,7 +17,6 @@ export default function PendingApprovalScreen() {
       if (typeof logout === "function") {
         await logout();
       }
-      router.replace("/(auth)/landing");
     } catch (error) {
       Alert.alert("Sign Out Error", error?.message || "Failed to sign out.");
     } finally {

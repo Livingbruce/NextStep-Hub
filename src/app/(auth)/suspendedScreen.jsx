@@ -25,8 +25,6 @@ export default function SuspendedScreen() {
 
     try {
       await logout();
-
-      router.replace("/(auth)/landing");
     } catch (error) {
       Alert.alert("Sign Out Error", error?.message || "Failed to sign out.");
       setLoading(false);

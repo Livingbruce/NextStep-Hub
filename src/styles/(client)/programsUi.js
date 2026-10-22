@@ -241,6 +241,28 @@ export const pg = StyleSheet.create({
     borderColor: "#FECACA",
     marginBottom: 14,
   },
+  posterModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  posterModalCloseBtn: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  posterModalImage: {
+    width: "100%",
+    height: "85%",
+  },
   errorText: { flex: 1, fontSize: 13, color: "#991B1B", fontWeight: "500" },
   errorRetry: { fontSize: 13, fontWeight: "800", color: "#DC2626" },
 });
