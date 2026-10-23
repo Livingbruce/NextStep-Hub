@@ -12,14 +12,7 @@ import {
 import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
 import { b, MAUVE } from "../../../styles/(client)/appointments/booking";
 import PressableScale from "../appointments/PressableScale";
-import {
-  addMinutes,
-  atMinutes,
-  DURATIONS,
-  fmtTime,
-  MODES,
-  toDateStr,
-} from "./slots";
+import { addMinutes, atMinutes, fmtTime, MODES, toDateStr } from "./slots";
 
 export const COUNSELING_TYPES = [
   {
@@ -238,11 +231,32 @@ export function GoalsStep({ form, update }) {
 }
 
 export function SessionStep({ form, update, phoneError }) {
+  const isOneHour = ["Individual", "Student", "Teen"].includes(form.type);
+  const isFamilyOrCouple = ["Family", "Couple"].includes(form.type);
+  const isGroup = form.type === "Group";
+
+  if (isOneHour && form.duration !== 60) {
+    update({ duration: 60 });
+  } else if (isFamilyOrCouple && form.duration !== 180) {
+    update({ duration: 180 });
+  } else if (isGroup && form.duration !== 120 && form.duration !== 180) {
+    update({ duration: 120 });
+  }
+
+  const availableDurations = isOneHour
+    ? [{ min: 60, caption: "1 Hour" }]
+    : isFamilyOrCouple
+      ? [{ min: 180, caption: "3 Hours" }]
+      : [
+          { min: 120, caption: "2 Hours" },
+          { min: 180, caption: "3 Hours" },
+        ];
+
   return (
     <View>
       <Text style={b.groupLabel}>Session length</Text>
       <View style={b.tiles}>
-        {DURATIONS.map((d) => {
+        {availableDurations.map((d) => {
           const on = form.duration === d.min;
           return (
             <PressableScale
@@ -250,6 +264,7 @@ export function SessionStep({ form, update, phoneError }) {
               containerStyle={{ flexGrow: 1, flexBasis: "47%" }}
               scaleTo={0.96}
               haptic
+              disabled={isOneHour || isFamilyOrCouple}
               onPress={() => update({ duration: d.min })}
               accessibilityState={{ selected: on }}
               style={[b.tile, on && b.tileOn]}

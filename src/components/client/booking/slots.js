@@ -1,8 +1,7 @@
 export const DURATIONS = [
-  { min: 30, caption: "Check-in" },
-  { min: 40, caption: "Focused" },
-  { min: 50, caption: "Standard" },
-  { min: 60, caption: "Extended" },
+  { min: 60, caption: "1 hour (Standard)" },
+  { min: 120, caption: "2 Hours" },
+  { min: 180, caption: "3 Hours" },
 ];
 
 export const MODES = [

@@ -84,12 +84,11 @@ const INITIAL = {
   callPhone: "",
   counselorId: "",
   dateStr: "",
-  slot: null, // start time as minutes from midnight
+  slot: null,
   agreed: false,
 };
 
-// Busy windows for a counselor on a day. Uses the RPC (works under RLS) and
-// falls back to a direct read if the function hasn't been created yet.
+// Busy windows for a counselor on a day.
 async function loadBusy(counselorId, dateStr) {
   const from = atMinutes(dateStr, 0);
   const to = new Date(from.getTime() + 24 * 3600000);
@@ -479,7 +478,7 @@ export default function NewAppointmentScreen() {
       case 5:
         return (
           <CounselorStep
-            counselors={counselors}
+            counselors={filteredCounselors}
             fetching={fetchingCounselors}
             form={form}
             update={update}
@@ -516,6 +515,21 @@ export default function NewAppointmentScreen() {
         );
     }
   };
+
+  const filteredCounselors = useMemo(() => {
+    if (!form.reasons || form.reasons.length === 0) return counselors;
+
+    const matched = counselors.filter((c) => {
+      if (!Array.isArray(c.specializations)) return false;
+      return form.reasons.some((reason) =>
+        c.specializations.some(
+          (spec) => spec.toLowerCase() === reason.toLowerCase(),
+        ),
+      );
+    });
+
+    return matched.length > 0 ? matched : counselors;
+  }, [counselors, form.reasons]);
 
   return (
     <SafeAreaView style={b.root} edges={["top", "bottom"]}>
