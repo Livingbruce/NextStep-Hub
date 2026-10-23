@@ -51,7 +51,7 @@ import { sendEmail } from "../../services/emailServer";
 import { welcomeEmail } from "../../services/emailTemplates";
 import { ACCENT, styles } from "../../styles/(auth)/signup";
 
-const SUPPORT_EMAIL = "support@nextstep.org";
+const SUPPORT_EMAIL = "nstephub@gmail.com";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const GENDER_OPTIONS = ["Male", "Female", "Prefer not to say"];
@@ -77,6 +77,27 @@ const ROLE_ICON = {
   Counselor: "people-outline",
   Admin: "shield-checkmark-outline",
 };
+
+const COUNSELOR_SPECIALIZATIONS = [
+  "Career Guidance",
+  "Family",
+  "Financial",
+  "Academic / School",
+  "Drug & Substance",
+  "Relationships",
+  "Mental Health",
+  "Trauma",
+  "Campus Transition",
+  "Grief & Loss",
+  "After Campus Transition",
+  "Couples & Premarital",
+  "Adolescent & Teen Support",
+  "Addiction & Behavioral Recovery",
+  "Spirituality & Faith-Based",
+  "Parenting & Family Dynamics",
+  "Life Coaching & Personal Growth",
+  "Workplace Stress & Burnout",
+];
 
 const digitsOnly = (v) => v.replace(/[^0-9]/g, "");
 const phoneChars = (v) => v.replace(/[^0-9+\s\-()]/g, "");
@@ -126,11 +147,8 @@ const initialForm = {
   otherReligion: "",
   about: "",
   yearsOfExperience: "",
-  specializations: [
-    { id: 1, text: "" },
-    { id: 2, text: "" },
-    { id: 3, text: "" },
-  ],
+  specializations: [],
+  customSpecializations: [{ id: 1, text: "" }],
   emergencyPhone: "",
   emergencyRelationship: "",
 };
@@ -324,40 +342,6 @@ export default function SignupScreen() {
     if (formError) setFormError(null);
   };
 
-  const updateSpecialization = (id, text) => {
-    setFormData((prev) => ({
-      ...prev,
-      specializations: prev.specializations.map((s) =>
-        s.id === id ? { ...s, text } : s,
-      ),
-    }));
-    if (errors.specializations)
-      setErrors((p) => ({ ...p, specializations: undefined }));
-  };
-
-  const addSpecialization = () => {
-    if (formData.specializations.length >= 8) return;
-    Haptics.selectionAsync().catch(() => {});
-    specCounter.current += 1;
-    const id = specCounter.current;
-    setFormData((prev) => ({
-      ...prev,
-      specializations: [...prev.specializations, { id, text: "" }],
-    }));
-  };
-
-  const removeSpecialization = (id) => {
-    Haptics.selectionAsync().catch(() => {});
-    setFormData((prev) =>
-      prev.specializations.length <= 1
-        ? prev
-        : {
-            ...prev,
-            specializations: prev.specializations.filter((s) => s.id !== id),
-          },
-    );
-  };
-
   const focusNext = (name) => {
     const order = fieldOrder(step, selectedRole, formData.religion);
     const next = order[order.indexOf(name) + 1];
@@ -413,8 +397,12 @@ export default function SignupScreen() {
           e.yearsOfExperience = "Enter your years of experience.";
         else if (parseInt(f.yearsOfExperience, 10) > 60)
           e.yearsOfExperience = "That looks too high, please check.";
-        if (!f.specializations.some((s) => s.text.trim())) {
-          e.specializations = "Add at least one area of specialization.";
+
+        const hasChip = f.specializations.length > 0;
+        const hasCustom = f.customSpecializations.some((s) => s.text.trim());
+        if (!hasChip && !hasCustom) {
+          e.specializations =
+            "Choose or add at least one area of specialization.";
         }
       }
       if (isClient) {
@@ -472,7 +460,6 @@ export default function SignupScreen() {
       alt_phone_no: formData.altPhoneNo.trim() || null,
       relationship_status: formData.relationshipStatus,
       religion,
-      // Clients are auto-approved; Counselors/Admins wait for admin review.
       approved: isClient,
       suspended: false,
     };
@@ -490,9 +477,11 @@ export default function SignupScreen() {
       payload.years_of_experience = formData.yearsOfExperience
         ? parseInt(formData.yearsOfExperience, 10)
         : null;
-      payload.specializations = formData.specializations
+      const chipSpecs = formData.specializations;
+      const customSpecs = formData.customSpecializations
         .map((s) => s.text.trim())
         .filter(Boolean);
+      payload.specializations = [...new Set([...chipSpecs, ...customSpecs])];
       payload.about = formData.about.trim();
     }
     if (isAdmin) {
@@ -876,6 +865,56 @@ export default function SignupScreen() {
       }
 
       if (isCounselor) {
+        const toggleSpec = (spec) => {
+          setFormData((prev) => {
+            const exists = prev.specializations.includes(spec);
+            return {
+              ...prev,
+              specializations: exists
+                ? prev.specializations.filter((s) => s !== spec)
+                : [...prev.specializations, spec],
+            };
+          });
+          if (errors.specializations)
+            setErrors((p) => ({ ...p, specializations: undefined }));
+        };
+
+        const addCustomSpec = () => {
+          if (formData.customSpecializations.length >= 5) return;
+          Haptics.selectionAsync().catch(() => {});
+          specCounter.current += 1;
+          const id = specCounter.current;
+          setFormData((prev) => ({
+            ...prev,
+            customSpecializations: [
+              ...prev.customSpecializations,
+              { id, text: "" },
+            ],
+          }));
+        };
+
+        const updateCustomSpec = (id, text) => {
+          setFormData((prev) => ({
+            ...prev,
+            customSpecializations: prev.customSpecializations.map((s) =>
+              s.id === id ? { ...s, text } : s,
+            ),
+          }));
+        };
+
+        const removeCustomSpec = (id) => {
+          Haptics.selectionAsync().catch(() => {});
+          setFormData((prev) => ({
+            ...prev,
+            customSpecializations:
+              prev.customSpecializations.length <= 1
+                ? [{ id: Date.now(), text: "" }]
+                : prev.customSpecializations.filter((s) => s.id !== id),
+          }));
+        };
+
+        const hasOtherSelected = formData.specializations.includes("Other");
+
         list.push(
           chips("gender", "Gender", GENDER_OPTIONS, "gender"),
           textField(
@@ -896,56 +935,85 @@ export default function SignupScreen() {
                   Areas of specialization
                   <Text style={styles.requiredStar}> *</Text>
                 </Text>
-                {formData.specializations.length < 8 && (
-                  <Pressable
-                    onPress={addSpecialization}
-                    style={styles.addSpecButton}
-                    hitSlop={8}
-                  >
-                    <Ionicons
-                      name="add-circle-outline"
-                      size={20}
-                      color={ACCENT}
-                    />
-                    <Text style={styles.addSpecText}>Add more</Text>
-                  </Pressable>
-                )}
               </View>
-              {formData.specializations.map((s, idx) => (
+              <View style={styles.chipsGrid}>
+                {COUNSELOR_SPECIALIZATIONS.map((spec) => (
+                  <SelectChip
+                    key={spec}
+                    label={spec}
+                    selected={formData.specializations.includes(spec)}
+                    onPress={() => toggleSpec(spec)}
+                    disabled={loading}
+                  />
+                ))}
+                <SelectChip
+                  label="Other"
+                  selected={hasOtherSelected}
+                  onPress={() => toggleSpec("Other")}
+                  disabled={loading}
+                />
+              </View>
+
+              {hasOtherSelected && (
                 <Animated.View
-                  key={s.id}
                   entering={FadeInDown.duration(250)}
-                  exiting={FadeOutRight.duration(200)}
-                  layout={LinearTransition.duration(250)}
-                  style={styles.specRow}
+                  style={{ marginTop: 14 }}
                 >
-                  <View style={{ flex: 1 }}>
-                    <FloatingInput
-                      label={`Specialization ${idx + 1}`}
-                      icon="ribbon-outline"
-                      value={s.text}
-                      onChangeText={(t) => updateSpecialization(s.id, t)}
-                      error={!!errors.specializations && idx === 0}
-                      editable={!loading}
-                      autoCapitalize="sentences"
-                    />
-                  </View>
-                  {formData.specializations.length > 1 && (
+                  <View style={styles.groupLabelRow}>
+                    <Text style={[styles.groupLabel, { fontSize: 13 }]}>
+                      Add other specializations
+                    </Text>
                     <Pressable
-                      onPress={() => removeSpecialization(s.id)}
-                      style={styles.specRemove}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remove specialization ${idx + 1}`}
+                      onPress={addCustomSpec}
+                      style={styles.addSpecButton}
+                      hitSlop={8}
                     >
                       <Ionicons
-                        name="trash-outline"
+                        name="add-circle-outline"
                         size={20}
-                        color="#DC2626"
+                        color={ACCENT}
                       />
+                      <Text style={styles.addSpecText}>Add field</Text>
                     </Pressable>
-                  )}
+                  </View>
+
+                  {formData.customSpecializations.map((s, idx) => (
+                    <Animated.View
+                      key={s.id}
+                      entering={FadeInDown.duration(250)}
+                      exiting={FadeOutRight.duration(200)}
+                      layout={LinearTransition.duration(250)}
+                      style={styles.specRow}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <FloatingInput
+                          label={`Custom Specialization ${idx + 1}`}
+                          icon="ribbon-outline"
+                          value={s.text}
+                          onChangeText={(t) => updateCustomSpec(s.id, t)}
+                          editable={!loading}
+                          autoCapitalize="sentences"
+                        />
+                      </View>
+                      {formData.customSpecializations.length > 1 && (
+                        <Pressable
+                          onPress={() => removeCustomSpec(s.id)}
+                          style={styles.specRemove}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove custom specialization ${idx + 1}`}
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={20}
+                            color="#DC2626"
+                          />
+                        </Pressable>
+                      )}
+                    </Animated.View>
+                  ))}
                 </Animated.View>
-              ))}
+              )}
+
               {!!errors.specializations && (
                 <Animated.Text
                   entering={FadeIn.duration(200)}

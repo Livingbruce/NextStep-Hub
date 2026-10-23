@@ -44,14 +44,24 @@ export const COUNSELING_TYPES = [
 ];
 
 export const REASONS = [
-  "Career",
+  "Career Guidance",
   "Family",
+  "Financial",
+  "Academic / School",
   "Drug & Substance",
   "Relationships",
-  "Financial",
   "Mental Health",
+  "Trauma",
   "Campus Transition",
+  "Grief & Loss",
   "After Campus Transition",
+  "Couples & Premarital",
+  "Adolescent & Teen Support",
+  "Addiction & Behavioral Recovery",
+  "Spirituality & Faith-Based",
+  "Parenting & Family Dynamics",
+  "Life Coaching & Personal Growth",
+  "Workplace Stress & Burnout",
   "Other",
 ];
 

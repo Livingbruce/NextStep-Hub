@@ -519,16 +519,43 @@ export default function NewAppointmentScreen() {
   const filteredCounselors = useMemo(() => {
     if (!form.reasons || form.reasons.length === 0) return counselors;
 
-    const matched = counselors.filter((c) => {
-      if (!Array.isArray(c.specializations)) return false;
-      return form.reasons.some((reason) =>
-        c.specializations.some(
-          (spec) => spec.toLowerCase() === reason.toLowerCase(),
-        ),
-      );
-    });
+    // 1. Score each counselor by how many reasons match their specializations
+    const scoredCounselors = counselors.map((c) => {
+      if (!Array.isArray(c.specializations) || c.specializations.length === 0) {
+        return { counselor: c, matchCount: 0, matchesAll: false };
+      }
 
-    return matched.length > 0 ? matched : counselors;
+      let matchCount = 0;
+      form.reasons.forEach((reason) => {
+        const cleanReason = reason.toLowerCase().trim();
+        const hasMatch = c.specializations.some((spec) => {
+          const cleanSpec = spec.toLowerCase().trim();
+          return (
+            cleanSpec === cleanReason ||
+            cleanSpec.includes(cleanReason) ||
+            cleanReason.includes(cleanSpec)
+          );
+        });
+        if (hasMatch) matchCount++;
+      });
+
+      const matchesAll = matchCount === form.reasons.length;
+      return { counselor: c, matchCount, matchesAll };
+    });
+    const validMatches = scoredCounselors.filter((item) => item.matchCount > 0);
+
+    if (validMatches.length === 0) {
+      return counselors;
+    }
+
+    // 2. Check if any counselor matches ALL the client's selected reasons
+    const fullMatches = validMatches.filter((item) => item.matchesAll);
+    if (fullMatches.length > 0) {
+      return fullMatches.map((item) => item.counselor);
+    }
+    validMatches.sort((a, b) => b.matchCount - a.matchCount);
+
+    return validMatches.map((item) => item.counselor);
   }, [counselors, form.reasons]);
 
   return (
