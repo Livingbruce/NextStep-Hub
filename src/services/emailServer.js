@@ -1,14 +1,11 @@
 import { supabase } from "../../libs/supabase";
 
-const ENDPOINTS = [
-  process.env.EXPO_PUBLIC_EMAIL_SERVICE_URL,
-  process.env.EXPO_PUBLIC_LOCAL_EMAIL_SERVICE_URL,
-]
+const ENDPOINTS = [process.env.EXPO_PUBLIC_EMAIL_SERVICE_URL]
   .map((u) => (u || "").trim())
   .filter(Boolean);
 
 const API_KEY = process.env.EXPO_PUBLIC_API_SECRET_KEY;
-const TIMEOUT_MS = [30000, 10000];
+const TIMEOUT_MS = [30000];
 
 async function postWithTimeout(url, options, ms) {
   const controller = new AbortController();
@@ -44,7 +41,7 @@ export const sendEmail = async ({ to, subject, text, html }) => {
       const response = await postWithTimeout(
         url,
         { method: "POST", headers, body },
-        TIMEOUT_MS[i] ?? 10000,
+        TIMEOUT_MS[i] ?? 30000,
       );
 
       const raw = await response.text();

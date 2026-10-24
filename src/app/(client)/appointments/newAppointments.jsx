@@ -519,10 +519,11 @@ export default function NewAppointmentScreen() {
   const filteredCounselors = useMemo(() => {
     if (!form.reasons || form.reasons.length === 0) return counselors;
 
-    // 1. Score each counselor by how many reasons match their specializations
-    const scoredCounselors = counselors.map((c) => {
+    const totalReasons = form.reasons.length;
+
+    const scored = counselors.map((c) => {
       if (!Array.isArray(c.specializations) || c.specializations.length === 0) {
-        return { counselor: c, matchCount: 0, matchesAll: false };
+        return { counselor: c, matchCount: 0 };
       }
 
       let matchCount = 0;
@@ -539,22 +540,27 @@ export default function NewAppointmentScreen() {
         if (hasMatch) matchCount++;
       });
 
-      const matchesAll = matchCount === form.reasons.length;
-      return { counselor: c, matchCount, matchesAll };
+      return { counselor: c, matchCount };
     });
-    const validMatches = scoredCounselors.filter((item) => item.matchCount > 0);
+
+    const validMatches = scored.filter((item) => item.matchCount > 0);
 
     if (validMatches.length === 0) {
       return counselors;
     }
 
-    // 2. Check if any counselor matches ALL the client's selected reasons
-    const fullMatches = validMatches.filter((item) => item.matchesAll);
-    if (fullMatches.length > 0) {
-      return fullMatches.map((item) => item.counselor);
-    }
     validMatches.sort((a, b) => b.matchCount - a.matchCount);
 
+    const highestMatchCount = validMatches[0].matchCount;
+
+    if (totalReasons >= 2) {
+      const topTierMatches = validMatches.filter(
+        (item) => item.matchCount === highestMatchCount,
+      );
+      if (topTierMatches.length === 1) {
+        return [topTierMatches[0].counselor];
+      }
+    }
     return validMatches.map((item) => item.counselor);
   }, [counselors, form.reasons]);
 

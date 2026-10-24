@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -245,13 +245,15 @@ export function SessionStep({ form, update, phoneError }) {
   const isFamilyOrCouple = ["Family", "Couple"].includes(form.type);
   const isGroup = form.type === "Group";
 
-  if (isOneHour && form.duration !== 60) {
-    update({ duration: 60 });
-  } else if (isFamilyOrCouple && form.duration !== 180) {
-    update({ duration: 180 });
-  } else if (isGroup && form.duration !== 120 && form.duration !== 180) {
-    update({ duration: 120 });
-  }
+  useEffect(() => {
+    if (isOneHour && form.duration !== 60) {
+      update({ duration: 60 });
+    } else if (isFamilyOrCouple && form.duration !== 180) {
+      update({ duration: 180 });
+    } else if (isGroup && form.duration !== 120 && form.duration !== 180) {
+      update({ duration: 120 });
+    }
+  }, [form.type]);
 
   const availableDurations = isOneHour
     ? [{ min: 60, caption: "1 Hour" }]
