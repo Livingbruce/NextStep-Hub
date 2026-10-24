@@ -237,7 +237,6 @@ export default function NewAppointmentScreen() {
     [form.dateStr, form.duration, busy],
   );
 
-  // If a chosen time stops being valid (new length, or just got taken), clear it.
   useEffect(() => {
     if (
       form.slot != null &&
@@ -246,8 +245,6 @@ export default function NewAppointmentScreen() {
       if (!loadingSlots) update({ slot: null });
     }
   }, [slots, loadingSlots]);
-
-  /* ------------------------------- navigation ------------------------------- */
   const goTo = (n) => {
     dir.current = n >= step ? 1 : -1;
     setStep(n);
@@ -261,8 +258,39 @@ export default function NewAppointmentScreen() {
   const handleNext = async () => {
     if (submitting) return;
 
-    if (step === 1 && !form.type)
-      return fail("Choose a type", "Please select a counseling type.");
+    if (step === 1) {
+      if (!form.type)
+        return fail("Choose a type", "Please select a counseling type.");
+
+      try {
+        setSubmitting(true);
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const nowIso = new Date().toISOString();
+          const { data: activeAppts, error } = await supabase
+            .from("appointments")
+            .select("id, scheduled_end_time, status")
+            .eq("client_id", user.id)
+            .in("status", ["scheduled", "pending_payment", "rescheduled"])
+            .gt("scheduled_end_time", nowIso);
+
+          if (!error && activeAppts && activeAppts.length > 0) {
+            setSubmitting(false);
+            return fail(
+              "Active session exists",
+              "You already have an active or upcoming session. Please wait until it is completed or its scheduled time passes before booking a new one.",
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Error checking active appointments:", err);
+      } finally {
+        setSubmitting(false);
+      }
+    }
+
     if (step === 2) {
       if (!form.reasons.length)
         return fail("Choose a reason", "Select at least one reason.");
@@ -568,7 +596,8 @@ export default function NewAppointmentScreen() {
     <SafeAreaView style={b.root} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <View style={b.max}>
           {/* Header */}
