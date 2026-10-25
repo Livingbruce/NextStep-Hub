@@ -235,6 +235,7 @@ export default function RootLayout() {
         ["landing", "login", "signup"].includes(segments[1]);
       if (!onAuthEntry) {
         router.replace("/(auth)/landing");
+        return;
       }
       setIsAppReady(true);
       return;
@@ -247,6 +248,7 @@ export default function RootLayout() {
     if (isSuspended) {
       if (currentAuthScreen !== "suspendedScreen") {
         router.replace("/(auth)/suspendedScreen");
+        return;
       }
       setIsAppReady(true);
       return;
@@ -255,19 +257,25 @@ export default function RootLayout() {
     if (!isApproved) {
       if (currentAuthScreen !== "pendingApproval") {
         router.replace("/(auth)/pendingApproval");
+        return;
       }
       setIsAppReady(true);
       return;
     }
 
     const role = user?.role?.toLowerCase();
+    const target =
+      role === "client"
+        ? "(client)"
+        : role === "counselor"
+          ? "(counselor)"
+          : role === "admin"
+            ? "(admin)"
+            : null;
 
-    if (role === "client" && segments[0] !== "(client)") {
-      router.replace("/(client)");
-    } else if (role === "counselor" && segments[0] !== "(counselor)") {
-      router.replace("/(counselor)");
-    } else if (role === "admin" && segments[0] !== "(admin)") {
-      router.replace("/(admin)");
+    if (target && segments[0] !== target) {
+      router.replace(`/${target}`);
+      return;
     }
 
     setIsAppReady(true);

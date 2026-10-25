@@ -87,6 +87,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: BG,
     zIndex: 9999,
+    elevation: 100,
     overflow: "hidden",
   },
   blobsContainer: {

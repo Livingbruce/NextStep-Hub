@@ -1,6 +1,6 @@
 const BRAND = "#F05A2B";
 const APP = "NextStep Hub";
-const SUPPORT = "support@nextstep.org";
+const SUPPORT = "nstephub@gmail.com";
 
 const esc = (v = "") =>
   String(v)

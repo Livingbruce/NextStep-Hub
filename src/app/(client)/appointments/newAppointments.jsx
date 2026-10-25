@@ -46,7 +46,7 @@ import {
   upcomingWeekdays,
   validateKenyanPhone,
 } from "../../../components/client/booking/slots";
-import { sendEmail } from "../../../services/emailServer";
+import { notifyCounselorBooking, sendEmail } from "../../../services/emailServer";
 import {
   clientBookingEmail,
   counselorBookingEmail,

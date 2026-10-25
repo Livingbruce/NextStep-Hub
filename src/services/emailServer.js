@@ -17,6 +17,41 @@ async function postWithTimeout(url, options, ms) {
   }
 }
 
+export const notifyCounselorBooking = async (appointmentId) => {
+  const base = (process.env.EXPO_PUBLIC_EMAIL_SERVICE_URL || "")
+    .trim()
+    .replace(/\/send-email\/?$/, "")
+    .replace(/\/$/, "");
+  if (!base)
+    return { success: false, error: "No email service URL configured" };
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) return { success: false, error: "No session" };
+
+  try {
+    const response = await postWithTimeout(
+      `${base}/notify-counselor-booking`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ appointmentId }),
+      },
+      30000,
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return { success: true, data };
+  } catch (err) {
+    console.warn("notifyCounselorBooking failed:", err.message);
+    return { success: false, error: err.message };
+  }
+};
+
 export const sendEmail = async ({ to, subject, text, html }) => {
   if (!ENDPOINTS.length) {
     return { success: false, error: "No email service URL configured" };
