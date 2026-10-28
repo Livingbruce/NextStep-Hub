@@ -8,9 +8,21 @@
     "scheme": "nextstephub",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is used for video counseling sessions.",
+        "NSMicrophoneUsageDescription": "Microphone is used for counseling sessions.",
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "BLUETOOTH",
+        "BLUETOOTH_CONNECT"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#090D16",
         "foregroundImage": "./assets/images/download.png",
