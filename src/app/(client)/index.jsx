@@ -20,6 +20,7 @@ import {
 
 import { checkAppointmentReminders } from "../../../libs/appointmentsReminder";
 import { supabase } from "../../../libs/supabase";
+import CallSetupCard from "../../components/call/CallSetupCard";
 import useJoinSession from "../../components/call/useJoinSession";
 import { CATEGORIES } from "../../components/client/Dashboard";
 import CategoryTile from "../../components/client/home/Categorytile";
@@ -302,6 +303,7 @@ export default function ClientDashboard() {
             </View>
           </View>
 
+          <CallSetupCard />
           <View style={styles.sectionContainer}>
             {/* Guidance category grid */}
             <Animated.View

@@ -4,11 +4,12 @@ import { supabase } from "./supabase";
 
 Notifications.setNotificationHandler({
   handleNotification: async (n) => {
-    const call = n.request.content.data?.type === "incoming_call";
+    const t = n.request.content.data?.type;
+    const quiet = t === "incoming_call" || t === "session_live";
     return {
-      shouldShowBanner: !call,
-      shouldShowList: !call,
-      shouldPlaySound: !call,
+      shouldShowBanner: !quiet,
+      shouldShowList: !quiet,
+      shouldPlaySound: !quiet,
       shouldSetBadge: false,
     };
   },

@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { PermissionsAndroid, Platform } from "react-native";
+import { Alert, PermissionsAndroid, Platform } from "react-native";
 import {
   ChannelProfileType,
   ClientRoleType,
@@ -74,6 +74,12 @@ export function CallProvider({ userId, children }) {
   const engineRef = useRef(null);
   const handlerRef = useRef(null);
   const sessionRef = useRef(null);
+
+  const remoteUidRef = useRef(null);
+  remoteUidRef.current = remoteUid;
+  const startCallRef = useRef(null);
+  const statusRef = useRef("idle");
+  statusRef.current = status;
 
   const [session, setSession] = useState(null);
   const [connecting, setConnecting] = useState(false);
@@ -219,6 +225,8 @@ export function CallProvider({ userId, children }) {
     [teardown],
   );
 
+  startCallRef.current = startCall;
+
   const endCall = useCallback(async () => {
     const s = sessionRef.current;
     teardown();
@@ -244,6 +252,35 @@ export function CallProvider({ userId, children }) {
     }
   }, []);
 
+  // Client declined (maybe by accident): hang up on the counselor side, offer to call again.
+  const handleDeclined = useCallback(
+    async (s) => {
+      teardown();
+      await supabase
+        .from("appointments")
+        .update({
+          call_status: "ended",
+          call_ended_at: new Date().toISOString(),
+        })
+        .eq("id", s.appointmentId);
+      Alert.alert(
+        "Call declined",
+        `${s.peerName} declined the call. It may have been by mistake.`,
+        [
+          { text: "OK", style: "cancel" },
+          {
+            text: "Call again",
+            onPress: () =>
+              startCallRef
+                .current?.({ ...s, notes: s.initialNotes })
+                .catch(() => {}),
+          },
+        ],
+      );
+    },
+    [teardown],
+  );
+
   // React to the other side via Supabase Realtime changes
   useEffect(() => {
     if (!session) return;
@@ -259,16 +296,41 @@ export function CallProvider({ userId, children }) {
         },
         (p) => {
           const n = p.new;
-          if (session.role === "counselor")
+          if (session.role === "counselor") {
             setClientResponse(n.client_response);
-          else if (n.call_status === "ended") teardown();
+            // Only hang up if the client hasn't actually joined the room
+            if (
+              n.client_response === "declined" &&
+              remoteUidRef.current == null
+            ) {
+              handleDeclined(sessionRef.current || session);
+            }
+          } else if (n.call_status === "ended") teardown();
         },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [session?.appointmentId, session?.role, teardown]);
+  }, [session?.appointmentId, session?.role, teardown, handleDeclined]);
+
+  // Counselor: an unanswered ring expires after ~45s. The call stays open and the client can still join.
+  useEffect(() => {
+    if (
+      session?.role !== "counselor" ||
+      clientResponse !== "ringing" ||
+      status === "live"
+    )
+      return;
+    const t = setTimeout(
+      () =>
+        supabase.rpc("expire_ring", {
+          p_appointment_id: session.appointmentId,
+        }),
+      45000,
+    );
+    return () => clearTimeout(t);
+  }, [session?.appointmentId, session?.role, clientResponse, status]);
 
   // Leave the call if the user logs out.
   useEffect(() => {
