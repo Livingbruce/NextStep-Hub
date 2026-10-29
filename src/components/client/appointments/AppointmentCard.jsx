@@ -21,6 +21,7 @@ import Animated, {
 import { styles } from "../../../styles/(client)/appointments/index";
 import { ui } from "../../../styles/(client)/appointments/ui";
 import { relativeLabel } from "../home/time";
+import JoinSessionButton from "./JoinSessionButton";
 import PressableScale from "./PressableScale";
 
 const HISTORY = [
@@ -107,6 +108,8 @@ export default function AppointmentCard({
   onDelete,
   busy,
   style,
+  live,
+  onJoin,
 }) {
   const [cancelReason, setCancelReason] = useState("");
   const [reviewText, setReviewText] = useState("");
@@ -146,7 +149,7 @@ export default function AppointmentCard({
     try {
       await Linking.openURL(url);
     } catch {
-      /* ignore: the link is shown so it can be copied */
+      console.warn("Failed to open link:", url);
     }
   };
 
@@ -222,6 +225,12 @@ export default function AppointmentCard({
           </View>
         </View>
       </PressableScale>
+
+      {isActive && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+          <JoinSessionButton apt={item} live={live} onJoin={onJoin} compact />
+        </View>
+      )}
 
       {expanded && (
         <Animated.View

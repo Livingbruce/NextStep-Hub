@@ -26,3 +26,13 @@ export function joinState(session, now) {
     label: now < start ? "Ready to start" : "In session window",
   };
 }
+
+// Client view: can only enter once the counselor is live.
+export function clientJoinState(apt, now, live) {
+  const base = joinState(apt, now);
+  if (base.state !== "open") return base;
+  if (live) return { state: "live", label: "Join now" };
+  if (apt.session_mode === "phone")
+    return { state: "phone", label: "Counselor will call you" };
+  return { state: "waiting", label: "Waiting for counselor" };
+}

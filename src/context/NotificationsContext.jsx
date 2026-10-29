@@ -46,7 +46,10 @@ export function NotificationsProvider({ userId, children }) {
       setNotifications((prev) =>
         prev.some((x) => x.id === n.id) ? prev : [n, ...prev],
       );
-      if (!n.type?.startsWith("appointment_reminder")) {
+      if (
+        !n.type?.startsWith("appointment_reminder") &&
+        n.type !== "session_live"
+      ) {
         showNotificationNow({
           title: n.title,
           body: n.body,

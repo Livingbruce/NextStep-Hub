@@ -13,12 +13,14 @@ import {
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../libs/supabase";
+import useJoinSession from "../../components/call/useJoinSession";
 import AnimatedTabs from "../../components/client/appointments/AnimatedTabs";
 import AppointmentCard, {
   isHistoryAppointment,
 } from "../../components/client/appointments/AppointmentCard";
 import AppointmentSkeletonList from "../../components/client/appointments/AppointmentSkeleton";
 import PressableScale from "../../components/client/appointments/PressableScale";
+import { useIncomingCall } from "../../context/IncomingCallContext";
 import { styles } from "../../styles/(client)/appointments/index";
 import { ui } from "../../styles/(client)/appointments/ui";
 
@@ -37,6 +39,9 @@ export default function AppointmentScreen() {
   const [activeTab, setActiveTab] = useState("upcoming");
   const [expandedId, setExpandedId] = useState(null);
   const hasLoaded = useRef(false);
+
+  const joinInApp = useJoinSession();
+  const { liveMap } = useIncomingCall();
 
   // ---- Responsive grid: 1 column on phones, 2 on tablets / landscape ----
   const columns = width >= 720 ? 2 : 1;
@@ -86,6 +91,8 @@ export default function AppointmentScreen() {
           payment_amount,
           currency,
           action_reason,
+          call_status,
+          session_mode,
           counselor:counselor_id (
             first_name,
             surname,
@@ -231,6 +238,16 @@ export default function AppointmentScreen() {
     );
   };
 
+  const handleJoin = (item) =>
+    joinInApp({
+      appointmentId: item.id,
+      role: "client",
+      peerName:
+        `Counselor ${item.counselor?.first_name || ""} ${item.counselor?.surname || ""}`.trim(),
+      subtitle: `${item.counseling_type} session`,
+      video: true,
+    });
+
   // ---- Derived lists ----
   const upcoming = useMemo(
     () => appointments.filter((a) => !isHistoryAppointment(a)),
@@ -331,6 +348,8 @@ export default function AppointmentScreen() {
                   onReview={handleReview}
                   onDelete={handleDelete}
                   busy={actionLoading && expandedId === item.id}
+                  live={liveMap[item.id] ?? item.call_status === "live"}
+                  onJoin={() => handleJoin(item)}
                 />
               ))}
             </View>

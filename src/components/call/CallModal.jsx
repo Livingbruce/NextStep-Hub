@@ -99,6 +99,8 @@ function Ctrl({ icon, label, on, onPress }) {
 export default function CallModal() {
   const insets = useSafeAreaInsets();
   const {
+    clientResponse,
+    ringAgain,
     session,
     expanded,
     status,
@@ -130,6 +132,10 @@ export default function CallModal() {
   const accent = counselor ? "#2563EB" : "#16A34A";
   const live = status === "live";
   const showRemoteVideo = remoteUid != null && remoteVideoOn;
+  const noAnswer =
+    counselor &&
+    !live &&
+    (clientResponse === "declined" || clientResponse === "missed");
 
   const finish = async () => {
     const s = session;
@@ -175,8 +181,12 @@ export default function CallModal() {
       ? "Reconnecting…"
       : !live
         ? counselor
-          ? `Waiting for ${session.peerName} to join…`
-          : "Waiting for your counselor…"
+          ? clientResponse === "declined"
+            ? `${session.peerName} declined the call`
+            : clientResponse === "missed"
+              ? `${session.peerName} didn't answer`
+              : `Calling ${session.peerName}…`
+          : "Connecting…"
         : session.video
           ? `${session.peerName}'s camera is off`
           : "Audio call in progress";
@@ -215,6 +225,16 @@ export default function CallModal() {
               </View>
               <Text style={cs.stageName}>{session.peerName}</Text>
               <Text style={cs.stageHint}>{hint}</Text>
+              {noAnswer && (
+                <PressableScale
+                  haptic
+                  style={[cs.notesToggle, { marginTop: 18 }]}
+                  onPress={ringAgain}
+                >
+                  <Ionicons name="call" size={15} color="#FFFFFF" />
+                  <Text style={cs.notesToggleText}>Ring again</Text>
+                </PressableScale>
+              )}
             </LinearGradient>
           )}
 

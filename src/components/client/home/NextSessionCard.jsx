@@ -14,6 +14,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { styles } from "../../../styles/(client)/Dashboard";
+import JoinSessionButton from "../appointments/JoinSessionButton";
 import { formatWhen, isSoon, relativeLabel } from "./time";
 
 function PulseDot() {
@@ -74,7 +75,13 @@ function HeroButton({ label, icon, primary, onPress }) {
   );
 }
 
-export default function NextSessionCard({ session, now, onJoin, onDetails }) {
+export default function NextSessionCard({
+  session,
+  now,
+  onJoin,
+  onDetails,
+  liveMap = {},
+}) {
   const soon = isSoon(session.dateTime, now);
   return (
     <Animated.View entering={FadeInDown.delay(250).duration(550)}>
@@ -113,14 +120,11 @@ export default function NextSessionCard({ session, now, onJoin, onDetails }) {
         </View>
 
         <View style={styles.heroActions}>
-          {session.link ? (
-            <HeroButton
-              primary
-              icon="videocam"
-              label="Join session"
-              onPress={onJoin}
-            />
-          ) : null}
+          <JoinSessionButton
+            apt={{ ...session, status: session.status }}
+            live={liveMap[session.id] ?? session.callLive}
+            onJoin={onJoin}
+          />
           <HeroButton
             icon="document-text-outline"
             label="Details"

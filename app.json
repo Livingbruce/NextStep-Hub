@@ -21,7 +21,9 @@
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS",
         "BLUETOOTH",
-        "BLUETOOTH_CONNECT"
+        "BLUETOOTH_CONNECT",
+        "USE_FULL_SCREEN_INTENT",
+        "VIBRATE"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#090D16",
@@ -57,7 +59,8 @@
         {
           "color": "#16A34A"
         }
-      ]
+      ],
+      "./plugin/withShowWhenLocked.js"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -3,12 +3,15 @@ import { Platform } from "react-native";
 import { supabase } from "./supabase";
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (n) => {
+    const call = n.request.content.data?.type === "incoming_call";
+    return {
+      shouldShowBanner: !call,
+      shouldShowList: !call,
+      shouldPlaySound: !call,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 const PREFIX = "apt-";

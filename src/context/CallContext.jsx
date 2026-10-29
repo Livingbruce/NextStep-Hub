@@ -44,9 +44,9 @@ async function ensurePermissions(video) {
   }
 }
 
-async function fetchToken(appointmentId) {
+async function fetchToken(appointmentId, opts = {}) {
   const { data, error } = await supabase.functions.invoke("agora-token", {
-    body: { appointmentId },
+    body: { appointmentId, ...opts },
   });
   if (error) throw new Error(await readFunctionError(error));
   if (!data?.token)
@@ -86,6 +86,7 @@ export function CallProvider({ userId, children }) {
   const [startedAt, setStartedAt] = useState(null);
   const [quality, setQuality] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  const [clientResponse, setClientResponse] = useState("ringing");
 
   const teardown = useCallback(() => {
     const engine = engineRef.current;
@@ -112,6 +113,7 @@ export function CallProvider({ userId, children }) {
     setStartedAt(null);
     setQuality(0);
     setExpanded(false);
+    setClientResponse("ringing");
   }, []);
 
   const startCall = useCallback(
@@ -131,7 +133,8 @@ export function CallProvider({ userId, children }) {
       setConnecting(true);
       try {
         await ensurePermissions(video);
-        const t = await fetchToken(appointmentId);
+        const t = await fetchToken(appointmentId, { video });
+        setClientResponse("ringing");
 
         const engine = createAgoraRtcEngine();
         engine.initialize({
@@ -164,7 +167,9 @@ export function CallProvider({ userId, children }) {
           },
           onTokenPrivilegeWillExpire: async () => {
             try {
-              const fresh = await fetchToken(sessionRef.current.appointmentId);
+              const fresh = await fetchToken(sessionRef.current.appointmentId, {
+                ring: false,
+              });
               engineRef.current?.renewToken(fresh.token);
             } catch (e) {
               console.warn("Token renew failed:", e);
@@ -228,6 +233,43 @@ export function CallProvider({ userId, children }) {
     }
   }, [teardown]);
 
+  const ringAgain = useCallback(async () => {
+    const s = sessionRef.current;
+    if (!s) return;
+    setClientResponse("ringing");
+    try {
+      await fetchToken(s.appointmentId, { video: s.video });
+    } catch (e) {
+      console.warn(e);
+    }
+  }, []);
+
+  // React to the other side via Supabase Realtime changes
+  useEffect(() => {
+    if (!session) return;
+    const ch = supabase
+      .channel(`call-${session.appointmentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "appointments",
+          filter: `id=eq.${session.appointmentId}`,
+        },
+        (p) => {
+          const n = p.new;
+          if (session.role === "counselor")
+            setClientResponse(n.client_response);
+          else if (n.call_status === "ended") teardown();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [session?.appointmentId, session?.role, teardown]);
+
   // Leave the call if the user logs out.
   useEffect(() => {
     if (!userId && engineRef.current) teardown();
@@ -280,8 +322,10 @@ export function CallProvider({ userId, children }) {
       startedAt,
       quality,
       expanded,
+      clientResponse,
       startCall,
       endCall,
+      ringAgain,
       toggleMute,
       toggleCamera,
       flipCamera,
@@ -301,8 +345,10 @@ export function CallProvider({ userId, children }) {
       startedAt,
       quality,
       expanded,
+      clientResponse,
       startCall,
       endCall,
+      ringAgain,
       toggleMute,
       toggleCamera,
       flipCamera,

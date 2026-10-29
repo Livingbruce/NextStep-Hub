@@ -20,6 +20,7 @@ import {
 
 import { checkAppointmentReminders } from "../../../libs/appointmentsReminder";
 import { supabase } from "../../../libs/supabase";
+import useJoinSession from "../../components/call/useJoinSession";
 import { CATEGORIES } from "../../components/client/Dashboard";
 import CategoryTile from "../../components/client/home/Categorytile";
 import EventCard from "../../components/client/home/EventCard";
@@ -30,6 +31,7 @@ import { useNow } from "../../components/client/home/time";
 import AuroraBlobs from "../../components/landing/AuroraBlobs";
 import RotatingText from "../../components/landing/Rotatingtext";
 import NotificationBell from "../../components/NotificationBell";
+import { useIncomingCall } from "../../context/IncomingCallContext";
 import { styles } from "../../styles/(client)/Dashboard";
 import { useAuth } from "../_layout";
 
@@ -56,6 +58,9 @@ export default function ClientDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [gridWidth, setGridWidth] = useState(0);
+
+  const joinInApp = useJoinSession();
+  const { liveMap } = useIncomingCall();
 
   useFocusEffect(
     useCallback(() => {
@@ -188,18 +193,16 @@ export default function ClientDashboard() {
     }
   };
 
-  const joinSession = (session) => {
-    if (!session.link) {
-      Alert.alert(
-        "Link Missing",
-        "Your counselor hasn't added a meeting link yet. Check back closer to your session.",
-      );
-      return;
-    }
-    Linking.openURL(session.link).catch(() =>
-      Alert.alert("Error", "Could not open the meeting link."),
-    );
-  };
+  const joinSession = (s) =>
+    joinInApp({
+      appointmentId: s.id,
+      role: "client",
+      peerName: s.counselorName
+        ? `Counselor ${s.counselorName}`
+        : "Your counselor",
+      subtitle: `${s.type || "Counseling"} session`,
+      video: true,
+    });
 
   // Responsive category grid
   const columns = width >= 900 ? 8 : isTablet ? 6 : 4;

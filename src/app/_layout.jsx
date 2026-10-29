@@ -21,6 +21,7 @@ import CallModal from "../components/call/CallModal";
 import MiniCallBar from "../components/call/MiniCallBar";
 import Preloader from "../components/preLoader";
 import { CallProvider } from "../context/CallContext";
+import { IncomingCallProvider } from "../context/IncomingCallContext";
 import { NotificationsProvider } from "../context/NotificationsContext";
 
 SplashScreen.preventAutoHideAsync();
@@ -332,23 +333,28 @@ export default function RootLayout() {
       <AuthContext.Provider value={{ user, login, logout, checkStatus }}>
         <NotificationsProvider userId={user?.id}>
           <CallProvider userId={user?.id}>
-            <View style={{ flex: 1, backgroundColor: "#090D16" }}>
-              <Slot />
-              <StatusBarGuard
-                show={segments[0] !== "(auth)" && isStartupDone}
-              />
-              <MiniCallBar />
-              <CallModal />
-              {!isStartupDone && (
-                <Preloader
-                  isReady={isAppReady}
-                  onFinish={() => {
-                    hasPreloaderFinishedGlobally = true;
-                    setIsStartupDone(true);
-                  }}
+            <IncomingCallProvider
+              userId={user?.id}
+              role={user?.role?.toLowerCase()}
+            >
+              <View style={{ flex: 1, backgroundColor: "#090D16" }}>
+                <Slot />
+                <StatusBarGuard
+                  show={segments[0] !== "(auth)" && isStartupDone}
                 />
-              )}
-            </View>
+                <MiniCallBar />
+                <CallModal />
+                {!isStartupDone && (
+                  <Preloader
+                    isReady={isAppReady}
+                    onFinish={() => {
+                      hasPreloaderFinishedGlobally = true;
+                      setIsStartupDone(true);
+                    }}
+                  />
+                )}
+              </View>
+            </IncomingCallProvider>
           </CallProvider>
         </NotificationsProvider>
       </AuthContext.Provider>
