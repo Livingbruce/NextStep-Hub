@@ -6,30 +6,54 @@ import {
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { View } from "react-native";
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+
 import {
   cancelAppointmentReminders,
   setupLocalNotifications,
 } from "../../libs/localNotifications";
 import { supabase } from "../../libs/supabase";
+
 import CallModal from "../components/call/CallModal";
 import MiniCallBar from "../components/call/MiniCallBar";
 import Preloader from "../components/preLoader";
+
 import { CallProvider } from "../context/CallContext";
 import { IncomingCallProvider } from "../context/IncomingCallContext";
 import { NotificationsProvider } from "../context/NotificationsContext";
 
-SplashScreen.preventAutoHideAsync();
-//SplashScreen.setOptions({ duration: 150, fade: true });
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+const AUTH_ENTRY_SCREENS = ["landing", "login", "signup"];
+const PRELOADER_BACKGROUND = "#090D16";
+const SESSION_CHECK_TIMEOUT = 8000;
+
+const AuthContext = createContext({
+  user: null,
+  login: async () => {},
+  logout: async () => {},
+  checkStatus: async () => null,
+});
+
+export const useAuth = () => useContext(AuthContext);
 
 function StatusBarGuard({ show }) {
   const insets = useSafeAreaInsets();
+
   if (!show || insets.top === 0) return null;
+
   return (
     <View
       pointerEvents="none"
@@ -46,153 +70,252 @@ function StatusBarGuard({ show }) {
   );
 }
 
-// Global cache to prevent session restoration from re-running on re-mounts
-let cachedUser = null;
-let isSessionRestoredGlobal = false;
-let hasPreloaderFinishedGlobally = false;
+/**
+ * Adds a timeout to Supabase requests.
+ */
+function withTimeout(promise, label, timeout = SESSION_CHECK_TIMEOUT) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out. Check your connection.`));
+    }, timeout);
 
-const AuthContext = createContext({
-  user: null,
-  login: () => {},
-  logout: () => {},
-  checkStatus: () => {},
-});
+    promise
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
 
-export const useAuth = () => useContext(AuthContext);
+/**
+ * Validate the access token with Supabase and retrieve the real profile.
+ */
+async function getVerifiedUser(session) {
+  if (!session?.access_token || !session?.user?.id) {
+    return null;
+  }
+
+  try {
+    // getSession() alone is not enough. It may return a locally stored session.
+    const {
+      data: { user: verifiedAuthUser },
+      error: authError,
+    } = await withTimeout(
+      supabase.auth.getUser(session.access_token),
+      "Session validation",
+    );
+
+    if (authError || !verifiedAuthUser?.id) {
+      console.warn("[Auth] Session could not be validated:", authError);
+      return null;
+    }
+
+    const { data: profile, error: profileError } = await withTimeout(
+      supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", verifiedAuthUser.id)
+        .maybeSingle(),
+      "Profile lookup",
+    );
+
+    if (profileError) {
+      console.warn("[Auth] Profile lookup failed:", profileError);
+      return null;
+    }
+
+    if (!profile) {
+      console.warn("[Auth] No profile exists for this account.");
+      return null;
+    }
+
+    const role = String(profile.role || "")
+      .trim()
+      .toLowerCase();
+
+    if (!role) {
+      console.warn("[Auth] Account has no assigned role.");
+      return null;
+    }
+
+    // Clients do not require staff approval or staff suspension checks.
+    if (role !== "client") {
+      if (
+        typeof profile.approved !== "boolean" ||
+        typeof profile.suspended !== "boolean"
+      ) {
+        console.warn("[Auth] Staff account status is incomplete.");
+        return null;
+      }
+    }
+
+    return {
+      ...verifiedAuthUser.user_metadata,
+      ...profile,
+      id: verifiedAuthUser.id,
+      email: verifiedAuthUser.email,
+      role,
+    };
+  } catch (error) {
+    console.warn("[Auth] Could not verify the current account:", error);
+    return null;
+  }
+}
+
+function getRoleRoute(role) {
+  switch (String(role || "").toLowerCase()) {
+    case "client":
+      return "/(client)";
+
+    case "counselor":
+      return "/(counselor)";
+
+    case "admin":
+      return "/(admin)";
+
+    default:
+      return "/(auth)/landing";
+  }
+}
 
 export default function RootLayout() {
-  const [user, setUser] = useState(cachedUser);
-  const [isSessionRestored, setIsSessionRestored] = useState(
-    isSessionRestoredGlobal,
-  );
-  const [isStartupDone, setIsStartupDone] = useState(
-    hasPreloaderFinishedGlobally,
-  );
-  const [isAppReady, setIsAppReady] = useState(hasPreloaderFinishedGlobally);
+  const [user, setUser] = useState(null);
+  const [isSessionRestored, setIsSessionRestored] = useState(false);
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [isStartupDone, setIsStartupDone] = useState(false);
+
   const segments = useSegments();
   const router = useRouter();
   const navigationState = useRootNavigationState();
 
+  const mountedRef = useRef(true);
+  const authCheckIdRef = useRef(0);
+
   useEffect(() => {
-    setupLocalNotifications().catch(() => {});
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
-  // Helper to fetch profile data from Supabase
-  const fetchUserProfile = async (authUser) => {
-    if (!authUser) return null;
-
-    try {
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", authUser.id)
-        .single();
-
-      if (error || !profile) {
-        return {
-          id: authUser.id,
-          email: authUser.email,
-          ...authUser.user_metadata,
-        };
-      }
-
-      return {
-        id: authUser.id,
-        email: authUser.email,
-        role: profile.role,
-        approved: profile.approved,
-        suspended: profile.suspended,
-        ...profile,
-      };
-    } catch (err) {
-      console.warn("Error fetching profile status:", err);
-      return null;
-    }
-  };
-
-  // 1. Restore session via Supabase and listen to auth changes (token expiry, external sign-outs)
   useEffect(() => {
-    let isMounted = true;
+    setupLocalNotifications().catch((error) => {
+      console.warn("[Notifications] Setup failed:", error);
+    });
+  }, []);
 
-    const initSession = async () => {
+  /**
+   * 1. Restore and validate the existing Supabase session.
+   */
+  useEffect(() => {
+    let active = true;
+
+    const restoreSession = async () => {
       try {
+        if (!navigationState?.key) return;
+
         const {
           data: { session },
-        } = await supabase.auth.getSession();
+          error: sessionError,
+        } = await withTimeout(
+          supabase.auth.getSession(),
+          "Session restoration",
+        );
 
-        if (session?.user) {
-          const profilePromise = fetchUserProfile(session.user);
-          const timeoutPromise = new Promise((resolve) =>
-            setTimeout(() => resolve(null), 2500),
-          );
-          const profileUser = await Promise.race([
-            profilePromise,
-            timeoutPromise,
-          ]);
+        if (sessionError) {
+          throw sessionError;
+        }
 
-          const resolvedUser = profileUser || {
-            id: session.user.id,
-            email: session.user.email,
-            ...session.user.user_metadata,
-          };
-
-          if (isMounted) {
-            cachedUser = resolvedUser;
-            setUser(resolvedUser);
-          }
-        } else {
-          if (isMounted) {
-            cachedUser = null;
+        if (!session?.user) {
+          if (active) {
             setUser(null);
           }
+          return;
         }
-      } catch (err) {
-        console.warn("Failed to restore session:", err);
+
+        const verifiedUser = await getVerifiedUser(session);
+
+        if (!active) return;
+
+        // Network failure, invalid token, or missing profile:
+        // show the landing page instead of a status screen.
+        setUser(verifiedUser);
+      } catch (error) {
+        console.warn("[Auth] Startup session check failed:", error);
+
+        if (active) {
+          setUser(null);
+        }
       } finally {
-        if (isMounted) {
-          isSessionRestoredGlobal = true;
+        if (active) {
           setIsSessionRestored(true);
         }
       }
     };
 
-    if (!isSessionRestoredGlobal) {
-      initSession();
-    } else {
-      setIsSessionRestored(true);
-    }
+    if (!navigationState?.key) return undefined;
+
+    // Reuse an in-progress restoration rather than launching another one.
+    restoreSession();
+
+    return () => {
+      active = false;
+    };
+  }, [navigationState?.key]);
+
+  /**
+   * 2. Listen for login, logout, token refresh, and account changes.
+   */
+  useEffect(() => {
+    let active = true;
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+
       if (event === "SIGNED_OUT" || !session) {
-        cachedUser = null;
-        if (isMounted) setUser(null);
-      } else if (
+        authCheckIdRef.current += 1;
+        setUser(null);
+        return;
+      }
+
+      if (
         event === "SIGNED_IN" ||
         event === "TOKEN_REFRESHED" ||
         event === "USER_UPDATED"
       ) {
-        const profileUser = await fetchUserProfile(session.user);
-        if (isMounted) {
-          cachedUser = profileUser;
-          setUser(profileUser);
-        }
+        const checkId = ++authCheckIdRef.current;
+
+        Promise.resolve().then(async () => {
+          const verifiedUser = await getVerifiedUser(session);
+
+          if (!active || checkId !== authCheckIdRef.current) return;
+
+          setUser(verifiedUser);
+        });
       }
     });
 
     return () => {
-      isMounted = false;
+      active = false;
       subscription?.unsubscribe();
     };
   }, []);
 
-  // 2. Real-time updates for approval, suspension, or role changes
+  /**
+   * 3. Monitor actual database changes to approval/suspension.
+   */
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || user.role === "client") return;
 
-    const ch = supabase
-      .channel(`profile-${user.id}`)
+    const channel = supabase
+      .channel(`profile-status-${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -201,128 +324,201 @@ export default function RootLayout() {
           table: "profiles",
           filter: `id=eq.${user.id}`,
         },
-        (p) => {
-          const updated = p.new;
-          setUser(
-            (u) =>
-              u && {
-                ...u,
-                approved: updated.approved,
-                suspended: updated.suspended,
-                role: updated.role,
-              },
-          );
+        (payload) => {
+          const updated = payload.new;
 
-          // Force immediate redirect if suspended or unapproved dynamically
-          if (updated.suspended) {
-            router.replace("/(auth)/suspendedScreen");
-          } else if (!updated.approved) {
-            router.replace("/(auth)/pendingApproval");
+          if (!updated) return;
+
+          // Ignore incomplete status updates. Never infer suspension.
+          if (
+            typeof updated.approved !== "boolean" ||
+            typeof updated.suspended !== "boolean"
+          ) {
+            return;
           }
+
+          const nextUser = {
+            ...user,
+            ...updated,
+            role: String(updated.role || user.role).toLowerCase(),
+          };
+
+          setUser(nextUser);
         },
       )
-      .subscribe();
+      .subscribe((status, error) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("[Auth] Profile status subscription issue:", error);
+        }
+      });
 
     return () => {
-      supabase.removeChannel(ch);
+      supabase.removeChannel(channel);
     };
-  }, [user?.id, router]);
+  }, [user?.id, user?.role]);
 
-  // 3. Status & Role Guard: Executes as soon as session is restored and navigation is mounted
+  /**
+   * 4. Central navigation guard.
+   */
   useEffect(() => {
-    if (!isSessionRestored) return;
-    if (!navigationState?.key) return;
+    if (!isSessionRestored || !navigationState?.key) return;
 
+    const currentGroup = segments[0];
+    const currentScreen = segments[1];
+
+    // No verified user: only allow the public authentication entry screens.
     if (!user) {
-      const onAuthEntry =
-        segments[0] === "(auth)" &&
-        ["landing", "login", "signup"].includes(segments[1]);
-      if (!onAuthEntry) {
+      const isAllowedAuthScreen =
+        currentGroup === "(auth)" && AUTH_ENTRY_SCREENS.includes(currentScreen);
+
+      if (!isAllowedAuthScreen) {
         router.replace("/(auth)/landing");
         return;
       }
+
       setIsAppReady(true);
       return;
     }
 
-    const isApproved = Boolean(user.approved);
-    const isSuspended = Boolean(user.suspended);
-    const currentAuthScreen = segments[1];
+    const role = String(user.role || "").toLowerCase();
 
-    if (isSuspended) {
-      if (currentAuthScreen !== "suspendedScreen") {
+    // CLIENT RULE:
+    // A client never sees pending approval or suspended screens.
+    if (role === "client") {
+      if (currentGroup !== "(client)") {
+        router.replace("/(client)");
+        return;
+      }
+
+      setIsAppReady(true);
+      return;
+    }
+
+    // Staff status must have been verified as actual booleans.
+    if (
+      typeof user.approved !== "boolean" ||
+      typeof user.suspended !== "boolean"
+    ) {
+      router.replace("/(auth)/landing");
+      return;
+    }
+
+    // Suspension takes precedence only when explicitly true.
+    if (user.suspended === true) {
+      if (currentScreen !== "suspendedScreen") {
         router.replace("/(auth)/suspendedScreen");
         return;
       }
+
       setIsAppReady(true);
       return;
     }
 
-    if (!isApproved) {
-      if (currentAuthScreen !== "pendingApproval") {
+    // Pending approval is shown only when explicitly false.
+    if (user.approved === false) {
+      if (currentScreen !== "pendingApproval") {
         router.replace("/(auth)/pendingApproval");
         return;
       }
+
       setIsAppReady(true);
       return;
     }
 
-    const role = user?.role?.toLowerCase();
-    const target =
-      role === "client"
-        ? "(client)"
-        : role === "counselor"
-          ? "(counselor)"
-          : role === "admin"
-            ? "(admin)"
-            : null;
+    // Approved staff members go directly to their role dashboard.
+    const target = getRoleRoute(role);
 
-    if (target && segments[0] !== target) {
-      router.replace(`/${target}`);
+    if (target === "/(auth)/landing") {
+      router.replace(target);
+      return;
+    }
+
+    const targetGroup = target.replace("/", "");
+
+    if (currentGroup !== targetGroup) {
+      router.replace(target);
       return;
     }
 
     setIsAppReady(true);
   }, [user, segments, isSessionRestored, navigationState?.key, router]);
 
-  const login = async (email, role, profile = null) => {
-    const fullUser = {
-      id: profile?.id,
-      email,
-      role: role || profile?.role,
-      approved: profile?.approved,
-      suspended: profile?.suspended,
-      ...profile,
-    };
-    cachedUser = fullUser;
-    setUser(fullUser);
-  };
+  const login = useCallback(async (email, role, profile = null) => {
+    if (!profile?.id) {
+      throw new Error("Your account profile could not be loaded.");
+    }
 
-  const logout = async () => {
+    const normalizedRole = String(role || profile.role || "")
+      .trim()
+      .toLowerCase();
+
+    if (!normalizedRole) {
+      throw new Error("Your account has no assigned role.");
+    }
+
+    if (
+      normalizedRole !== "client" &&
+      (typeof profile.approved !== "boolean" ||
+        typeof profile.suspended !== "boolean")
+    ) {
+      throw new Error("Your account status could not be verified.");
+    }
+
+    setUser({
+      ...profile,
+      email: email || profile.email,
+      role: normalizedRole,
+    });
+
+    setIsSessionRestored(true);
+  }, []);
+
+  /**
+   * 6. Logout.
+   */
+  const logout = useCallback(async () => {
     try {
       await cancelAppointmentReminders().catch(() => {});
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.warn("Failed to clear session:", err);
+
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        throw error;
+      }
     } finally {
-      cachedUser = null;
       setUser(null);
     }
-  };
+  }, []);
 
-  const checkStatus = async () => {
-    if (!user) return null;
+  /**
+   * 7. Manually refresh approval/suspension status.
+   */
+  const checkStatus = useCallback(async () => {
     const {
       data: { session },
+      error: sessionError,
     } = await supabase.auth.getSession();
-    if (session?.user) {
-      const fresh = await fetchUserProfile(session.user);
-      cachedUser = fresh;
-      setUser(fresh);
-      return fresh;
+
+    if (sessionError) {
+      throw sessionError;
     }
-    return null;
-  };
+
+    if (!session?.user) {
+      setUser(null);
+      return null;
+    }
+
+    const freshUser = await getVerifiedUser(session);
+
+    if (!freshUser) {
+      throw new Error(
+        "We couldn't verify your account. Check your internet connection and try again.",
+      );
+    }
+
+    setUser(freshUser);
+    return freshUser;
+  }, []);
 
   return (
     <SafeAreaProvider>
@@ -330,25 +526,40 @@ export default function RootLayout() {
         style={!isStartupDone || segments[0] === "(auth)" ? "light" : "dark"}
         translucent
       />
-      <AuthContext.Provider value={{ user, login, logout, checkStatus }}>
+
+      <AuthContext.Provider
+        value={{
+          user,
+          login,
+          logout,
+          checkStatus,
+        }}
+      >
         <NotificationsProvider userId={user?.id}>
           <CallProvider userId={user?.id}>
             <IncomingCallProvider
               userId={user?.id}
               role={user?.role?.toLowerCase()}
             >
-              <View style={{ flex: 1, backgroundColor: "#090D16" }}>
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: PRELOADER_BACKGROUND,
+                }}
+              >
                 <Slot />
+
                 <StatusBarGuard
                   show={segments[0] !== "(auth)" && isStartupDone}
                 />
+
                 <MiniCallBar />
                 <CallModal />
+
                 {!isStartupDone && (
                   <Preloader
                     isReady={isAppReady}
                     onFinish={() => {
-                      hasPreloaderFinishedGlobally = true;
                       setIsStartupDone(true);
                     }}
                   />
