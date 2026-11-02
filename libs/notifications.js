@@ -88,19 +88,32 @@ export function subscribeToNotifications(userId, onInsert) {
 
   let active = true;
 
-  channel.subscribe((status) => {
+  channel.subscribe((status, err) => {
     if (!active) return;
 
+    console.log("[Notifications Realtime] Status:", status);
+
+    if (err) {
+      console.error(
+        "[Notifications Realtime] Error details:",
+        JSON.stringify(err),
+      );
+    }
+
     if (status === "SUBSCRIBED") {
-      console.log("Notifications realtime subscribed");
+      console.log("[Notifications Realtime] Successfully subscribed.");
     }
 
     if (status === "CHANNEL_ERROR") {
-      console.warn("Notifications realtime channel error");
+      console.error("[Notifications Realtime] Channel failed:", err);
     }
 
     if (status === "TIMED_OUT") {
-      console.warn("Notifications realtime subscription timed out");
+      console.error("[Notifications Realtime] Subscription timed out.");
+    }
+
+    if (status === "CLOSED") {
+      console.warn("[Notifications Realtime] Channel closed.");
     }
   });
 

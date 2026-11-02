@@ -15,7 +15,7 @@ import { supabase } from "../../libs/supabase";
 
 const TASK = "INCOMING_CALL_TASK";
 
-export const CALL_CHANNEL = "calls";
+export const CALL_CHANNEL = "incomimg_calls_v2";
 export const RING_MS = 45000;
 
 export const callNotificationId = (id) => `call_${id}`;
@@ -208,43 +208,83 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 });
 
 export async function registerPushToken(userId) {
-  if (!Device.isDevice || !userId) return;
-
-  let permission = await Notifications.getPermissionsAsync();
-
-  if (permission.status !== "granted") {
-    permission = await Notifications.requestPermissionsAsync();
-  }
-
-  if (permission.status !== "granted") {
-    console.warn("[IncomingCall] Notification permission not granted.");
-    return;
-  }
-
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-
-  if (!projectId) {
-    console.error("[IncomingCall] EAS project ID is missing.");
-    return;
-  }
-
-  const { data: token } = await Notifications.getExpoPushTokenAsync({
-    projectId,
+  console.log("[PushRegistration] Starting", {
+    userId,
+    isPhysicalDevice: Device.isDevice,
+    platform: Platform.OS,
   });
 
-  const { error } = await supabase.from("push_tokens").upsert(
-    {
-      token,
-      user_id: userId,
-      platform: Platform.OS,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "token" },
-  );
+  if (!Device.isDevice) {
+    console.warn("[PushRegistration] Not a physical device.");
+    return;
+  }
 
-  if (error) {
-    console.error("[IncomingCall] Push token save failed:", error);
-  } else {
-    console.log("[IncomingCall] Push token registered.");
+  if (!userId) {
+    console.warn("[PushRegistration] Missing user ID.");
+    return;
+  }
+
+  try {
+    let permission = await Notifications.getPermissionsAsync();
+
+    console.log("[PushRegistration] Current permission:", permission);
+
+    if (permission.status !== "granted") {
+      permission = await Notifications.requestPermissionsAsync();
+    }
+
+    if (permission.status !== "granted") {
+      console.warn("[PushRegistration] Permission denied:", permission.status);
+      return;
+    }
+
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+
+    console.log("[PushRegistration] EAS project ID:", projectId);
+
+    if (!projectId) {
+      console.error("[PushRegistration] Missing EAS project ID.");
+      return;
+    }
+
+    const result = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
+
+    const token = result.data;
+
+    console.log("[PushRegistration] Expo token received:", token);
+
+    if (!token) {
+      console.error("[PushRegistration] Expo returned an empty token.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("push_tokens")
+      .upsert(
+        {
+          token,
+          user_id: userId,
+          platform: Platform.OS,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "token" },
+      )
+      .select();
+
+    if (error) {
+      console.error("[PushRegistration] Push token save failed:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      return;
+    }
+
+    console.log("[PushRegistration] Token saved successfully:", data);
+  } catch (error) {
+    console.error("[PushRegistration] Registration failed:", error);
   }
 }

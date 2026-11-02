@@ -2,63 +2,46 @@
   "expo": {
     "name": "NextStep Hub",
     "slug": "NSMentorship",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logoimage-removebg.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "nextstephub",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSCameraUsageDescription": "Camera is used for video counseling sessions.",
-        "NSMicrophoneUsageDescription": "Microphone is used for counseling sessions.",
-        "UIBackgroundModes": ["audio"]
-      }
+      "supportsTablet": true
     },
     "android": {
-      "permissions": [
-        "SYSTEM_ALERT_WINDOW",
-        "USE_FULL_SCREEN_INTENT",
-        "POST_NOTIFICATIONS",
-        "WAKE_LOCK",
-        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
-      ],
+      "package": "com.living_bruce.NSMentorship",
+      "googleServicesFile": "google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#090D16",
-        "foregroundImage": "./assets/images/download.png",
-        "backgroundImage": "./assets/images/iconlogo-removebg.png",
-        "monochromeImage": "./assets/images/monochrome-removebg.png"
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "package": "com.living_bruce.NSMentorship"
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/logoimage-removebg.png"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/logoimage-removebg.png",
-          "imageWidth": 220,
-          "resizeMode": "contain",
-          "backgroundColor": "#090D16"
+          "backgroundColor": "#090D16",
+          "image": "./assets/images/icon.png",
+          "imageWidth": 120,
+          "resizeMode": "contain"
         }
       ],
       "@react-native-community/datetimepicker",
       "expo-secure-store",
       "expo-image",
       "expo-web-browser",
-      [
-        "expo-notifications",
-        {
-          "color": "#16A34A"
-        }
-      ],
-      "./plugin/withShowWhenLocked.js"
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -69,12 +52,6 @@
       "eas": {
         "projectId": "97c4eaf1-5622-45b1-859d-9f558a50ef07"
       }
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/97c4eaf1-5622-45b1-859d-9f558a50ef07"
     }
   }
 }
