@@ -59,12 +59,13 @@ function parseIncomingPayload(taskData) {
       }
     }
 
-    if (
-      candidate &&
-      typeof candidate === "object" &&
-      candidate.type === "incoming_call" &&
-      candidate.appointmentId
-    ) {
+    if (!candidate || typeof candidate !== "object") continue;
+
+    if (candidate.type === "session_live") {
+      return null;
+    }
+
+    if (candidate.type === "incoming_call" && candidate.appointmentId) {
       return candidate;
     }
   }
@@ -155,9 +156,8 @@ TaskManager.defineTask(TASK, async ({ data, error }) => {
     const payload = parseIncomingPayload(data);
 
     if (!payload) {
-      console.warn(
-        "[IncomingCall] Could not parse incoming notification payload:",
-        JSON.stringify(data),
+      console.log(
+        "[IncomingCall] No incoming-call payload in this notification.",
       );
       return;
     }

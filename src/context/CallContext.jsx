@@ -71,19 +71,9 @@ export function useCallTimer(startedAt) {
 }
 
 export function CallProvider({ userId, children }) {
-  const engineRef = useRef(null);
-  const handlerRef = useRef(null);
-  const sessionRef = useRef(null);
-
-  const remoteUidRef = useRef(null);
-  remoteUidRef.current = remoteUid;
-  const startCallRef = useRef(null);
-  const statusRef = useRef("idle");
-  statusRef.current = status;
-
   const [session, setSession] = useState(null);
   const [connecting, setConnecting] = useState(false);
-  const [status, setStatus] = useState("idle"); // idle | waiting | live | reconnecting
+  const [status, setStatus] = useState("idle");
   const [remoteUid, setRemoteUid] = useState(null);
   const [remoteVideoOn, setRemoteVideoOn] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -93,6 +83,18 @@ export function CallProvider({ userId, children }) {
   const [quality, setQuality] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [clientResponse, setClientResponse] = useState("ringing");
+
+  const engineRef = useRef(null);
+  const handlerRef = useRef(null);
+  const sessionRef = useRef(null);
+
+  const remoteUidRef = useRef(null);
+  remoteUidRef.current = remoteUid;
+
+  const startCallRef = useRef(null);
+
+  const statusRef = useRef("idle");
+  statusRef.current = status;
 
   const teardown = useCallback(() => {
     const engine = engineRef.current;

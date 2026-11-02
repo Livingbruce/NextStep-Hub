@@ -36,6 +36,7 @@ export function IncomingCallProvider({ userId, role, children }) {
   incomingRef.current = incoming;
   const inCallRef = useRef(false);
   inCallRef.current = !!call.session;
+  const openingIdsRef = useRef(new Set());
 
   const isClient = role === "client";
 
@@ -45,30 +46,63 @@ export function IncomingCallProvider({ userId, role, children }) {
   }, []);
 
   const open = useCallback(async (id) => {
-    if (inCallRef.current || incomingRef.current?.id === id) return;
-    const { data } = await supabase
-      .from("appointments")
-      .select(SELECT)
-      .eq("id", id)
-      .maybeSingle();
     if (
-      !data ||
-      data.call_status !== "live" ||
-      data.client_response !== "ringing"
-    )
+      !id ||
+      inCallRef.current ||
+      incomingRef.current?.id === id ||
+      openingIdsRef.current.has(id)
+    ) {
       return;
-    const c = Array.isArray(data.counselor)
-      ? data.counselor[0]
-      : data.counselor;
-    setIncoming({
-      id: data.id,
-      name: `Counselor ${[c?.first_name, c?.surname].filter(Boolean).join(" ")}`.trim(),
-      mode: data.call_mode || "video",
-      type: data.counseling_type,
-      ringingAt: data.call_ringing_at
-        ? new Date(data.call_ringing_at).getTime()
-        : Date.now(),
-    });
+    }
+
+    openingIdsRef.current.add(id);
+
+    try {
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(SELECT)
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("[IncomingCall] Appointment lookup failed:", error);
+        return;
+      }
+
+      if (
+        !data ||
+        data.call_status !== "live" ||
+        data.client_response !== "ringing"
+      ) {
+        return;
+      }
+
+      if (inCallRef.current || incomingRef.current?.id === id) {
+        return;
+      }
+
+      const c = Array.isArray(data.counselor)
+        ? data.counselor[0]
+        : data.counselor;
+
+      setIncoming({
+        id: data.id,
+        name: `Counselor ${[c?.first_name, c?.surname]
+          .filter(Boolean)
+          .join(" ")}`.trim(),
+        mode: data.call_mode || "video",
+        type: data.counseling_type,
+        ringingAt: data.call_ringing_at
+          ? new Date(data.call_ringing_at).getTime()
+          : Date.now(),
+      });
+
+      console.log("[IncomingCall] Opened incoming call:", id);
+    } catch (error) {
+      console.error("[IncomingCall] Failed to open call:", error);
+    } finally {
+      openingIdsRef.current.delete(id);
+    }
   }, []);
 
   const accept = useCallback(
