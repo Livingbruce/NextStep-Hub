@@ -196,7 +196,13 @@ object Overlay {
         wm?.addView(card, lp)
         view = card
         main.postDelayed(timeout, timeoutMs)
-      } catch (_: Exception) {}
+      } catch (e: Exception) {
+        android.util.Log.e(
+          "CallOverlay",
+          "Failed to display incoming call overlay",
+          e
+        )
+      }
     }
   }
 }

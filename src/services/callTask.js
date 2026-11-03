@@ -139,12 +139,14 @@ TaskManager.defineTask(TASK, async ({ data, error }) => {
   if (AppState.currentState === "active") return;
 
   const useOverlay = canDrawOverlays() && !isLocked();
+
   if (useOverlay) {
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      showCallOverlay({
+
+      await showCallOverlay({
         appointmentId: String(payload.appointmentId),
         name: payload.callerName || "Your counselor",
         mode: payload.mode || "video",
@@ -156,12 +158,24 @@ TaskManager.defineTask(TASK, async ({ data, error }) => {
         anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
         accessToken: session?.access_token,
       });
-      await showCall(payload, { quiet: true });
+
+      console.log("[IncomingCall] Overlay requested");
+
+      try {
+        await showCall(payload, { quiet: true });
+      } catch (notificationError) {
+        console.error(
+          "[IncomingCall] Quiet notification failed:",
+          notificationError,
+        );
+      }
+
       return;
     } catch (e) {
       console.error("[IncomingCall] Overlay failed, using notification:", e);
     }
   }
+
   await showCall(payload);
 });
 
