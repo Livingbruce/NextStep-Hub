@@ -12,6 +12,11 @@ import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
 
 import { supabase } from "../../libs/supabase";
+import {
+  canDrawOverlays,
+  isLocked,
+  showCallOverlay,
+} from "../../modules/call-overlay";
 
 const TASK = "INCOMING_CALL_TASK";
 
@@ -19,6 +24,7 @@ export const CALL_CHANNEL = "incomimg_calls_v2";
 export const RING_MS = 45000;
 
 export const callNotificationId = (id) => `call_${id}`;
+export const QUIET_CHANNEL = "calls_quiet";
 
 export const respondToCall = (appointmentId, response) =>
   supabase.rpc("respond_to_call", {
@@ -34,6 +40,17 @@ async function ensureChannel() {
     visibility: AndroidVisibility.PUBLIC,
     sound: "default",
     vibration: true,
+  });
+}
+
+async function ensureQuietChannel() {
+  return notifee.createChannel({
+    id: QUIET_CHANNEL,
+    name: "Incoming calls (ringing)",
+    importance: AndroidImportance.DEFAULT,
+    sound: "default",
+    vibration: true,
+    vibrationPattern: [300, 500, 300, 500],
   });
 }
 
@@ -73,101 +90,75 @@ function parseIncomingPayload(taskData) {
   return null;
 }
 
-async function showCall(payload) {
-  if (!payload?.appointmentId) {
+export async function showCall(payload, { quiet = false } = {}) {
+  if (!payload?.appointmentId)
     throw new Error("Incoming call has no appointment ID.");
-  }
-
-  const channelId = await ensureChannel();
+  const channelId = quiet ? await ensureQuietChannel() : await ensureChannel();
 
   await notifee.displayNotification({
     id: callNotificationId(payload.appointmentId),
-
     title: payload.callerName || "Your counselor",
-
-    body: `Incoming ${payload.mode === "audio" ? "audio" : "video"} session · ${
-      payload.sessionType || "Counseling"
-    }`,
-
+    body: `Incoming ${payload.mode === "audio" ? "audio" : "video"} session · ${payload.sessionType || "Counseling"}`,
     data: {
-      type: "incoming_call",
-      appointmentId: String(payload.appointmentId),
-      callerName: payload.callerName || "Your counselor",
-      mode: payload.mode || "video",
-      sessionType: payload.sessionType || "Counseling",
+      /* unchanged */
     },
-
     android: {
       channelId,
       category: AndroidCategory.CALL,
-      importance: AndroidImportance.HIGH,
+      importance: quiet ? AndroidImportance.DEFAULT : AndroidImportance.HIGH,
       visibility: AndroidVisibility.PUBLIC,
-
-      // Verify that this resource exists in your generated Android project.
-      smallIcon: "ic_launcher",
+      smallIcon: "notification_icon",
       color: "#16A34A",
-
       ongoing: true,
       autoCancel: false,
       timeoutAfter: RING_MS,
       loopSound: true,
-
-      pressAction: {
-        id: "default",
-        launchActivity: "default",
-      },
-
-      fullScreenAction: {
-        id: "default",
-        launchActivity: "default",
-      },
-
+      pressAction: { id: "default", launchActivity: "default" },
+      ...(quiet
+        ? {}
+        : { fullScreenAction: { id: "default", launchActivity: "default" } }),
       actions: [
-        {
-          title: "Decline",
-          pressAction: { id: "decline" },
-        },
+        { title: "Decline", pressAction: { id: "decline" } },
         {
           title: "Accept",
-          pressAction: {
-            id: "accept",
-            launchActivity: "default",
-          },
+          pressAction: { id: "accept", launchActivity: "default" },
         },
       ],
     },
   });
-
-  console.log(
-    "[IncomingCall] Native notification displayed:",
-    payload.appointmentId,
-  );
 }
 
 TaskManager.defineTask(TASK, async ({ data, error }) => {
-  if (Platform.OS !== "android") return;
+  if (Platform.OS !== "android" || error) return;
+  const payload = parseIncomingPayload(data);
+  if (!payload) return;
+  if (AppState.currentState === "active") return;
 
-  if (error) {
-    console.error("[IncomingCall] Background task error:", error);
-    return;
-  }
-
-  try {
-    const payload = parseIncomingPayload(data);
-
-    if (!payload) {
-      console.log(
-        "[IncomingCall] No incoming-call payload in this notification.",
-      );
+  const useOverlay = canDrawOverlays() && !isLocked();
+  if (useOverlay) {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      showCallOverlay({
+        appointmentId: String(payload.appointmentId),
+        name: payload.callerName || "Your counselor",
+        mode: payload.mode || "video",
+        type: payload.sessionType || "Counseling",
+        scheme: "nextstephub",
+        channelId: QUIET_CHANNEL,
+        timeoutMs: RING_MS,
+        supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+        anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+        accessToken: session?.access_token,
+      });
+      await showCall(payload, { quiet: true });
       return;
+    } catch (e) {
+      console.error("[IncomingCall] Overlay failed, using notification:", e);
     }
-
-    console.log("[IncomingCall] Received call:", payload.appointmentId);
-
-    await showCall(payload);
-  } catch (err) {
-    console.error("[IncomingCall] Failed to display call:", err);
   }
+  await showCall(payload);
 });
 
 // Register the background task during module initialization.

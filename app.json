@@ -19,7 +19,10 @@
         "backgroundImage": "./assets/images/iconlogo-removebg.png",
         "monochromeImage": "./assets/images/monochrome-removebg.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -52,6 +55,9 @@
       "eas": {
         "projectId": "97c4eaf1-5622-45b1-859d-9f558a50ef07"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/97c4eaf1-5622-45b1-859d-9f558a50ef07"
     }
   }
 }

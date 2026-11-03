@@ -1,4 +1,5 @@
 import notifee, { EventType } from "@notifee/react-native";
+import * as Linking from "expo-linking";
 import {
   createContext,
   useCallback,
@@ -37,6 +38,7 @@ export function IncomingCallProvider({ userId, role, children }) {
   const inCallRef = useRef(false);
   inCallRef.current = !!call.session;
   const openingIdsRef = useRef(new Set());
+  const handledLinks = useRef(new Set());
 
   const isClient = role === "client";
 
@@ -170,6 +172,26 @@ export function IncomingCallProvider({ userId, role, children }) {
       .limit(1);
     if (data?.[0]) open(data[0].id);
   }, [userId, isClient, open]);
+
+  // Show the call overlay if possible, otherwise show a notification.
+  useEffect(() => {
+    if (!isClient) return;
+    const go = (url) => {
+      if (!url) return;
+      const q = Linking.parse(url)?.queryParams || {};
+      const id = q.acceptCall;
+      if (!id || handledLinks.current.has(id)) return;
+      handledLinks.current.add(id);
+      accept(String(id), {
+        name: q.name,
+        mode: q.mode || "video",
+        type: q.type,
+      });
+    };
+    Linking.getInitialURL().then(go);
+    const sub = Linking.addEventListener("url", ({ url }) => go(url));
+    return () => sub.remove();
+  }, [isClient, accept]);
 
   useEffect(() => {
     if (!userId || !isClient) return;
