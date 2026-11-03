@@ -9,7 +9,7 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 import { supabase } from "../../libs/supabase";
 import {
@@ -100,7 +100,11 @@ export async function showCall(payload, { quiet = false } = {}) {
     title: payload.callerName || "Your counselor",
     body: `Incoming ${payload.mode === "audio" ? "audio" : "video"} session · ${payload.sessionType || "Counseling"}`,
     data: {
-      /* unchanged */
+      type: "incoming_call",
+      appointmentId: String(payload.appointmentId),
+      callerName: payload.callerName || "Your counselor",
+      mode: payload.mode || "video",
+      sessionType: payload.sessionType || "Counseling",
     },
     android: {
       channelId,

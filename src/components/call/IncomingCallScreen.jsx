@@ -15,8 +15,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { initials } from "../components/call/CallModal";
-import PressableScale from "../components/client/appointments/PressableScale";
+import PressableScale from "../client/appointments/PressableScale";
+import { initials } from "./CallModal";
 
 function Ring({ delay }) {
   const t = useSharedValue(0);

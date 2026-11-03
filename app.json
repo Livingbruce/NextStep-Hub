@@ -22,7 +22,19 @@
       "predictiveBackGestureEnabled": false,
       "runtimeVersion": {
         "policy": "appVersion"
-      }
+      },
+      "permissions": [
+        "SYSTEM_ALERT_WINDOW",
+        "USE_FULL_SCREEN_INTENT",
+        "POST_NOTIFICATIONS",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "BLUETOOTH_CONNECT",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -44,7 +56,11 @@
       "expo-secure-store",
       "expo-image",
       "expo-web-browser",
-      "expo-notifications"
+      [
+        "expo-notifications",
+        { "icon": "./assets/images/download.png", "color": "#16A34A" }
+      ],
+      "./plugin/withShowWhenLocked"
     ],
     "experiments": {
       "typedRoutes": true,

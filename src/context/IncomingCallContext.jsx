@@ -10,7 +10,7 @@ import {
 } from "react";
 import { AppState } from "react-native";
 import { supabase } from "../../libs/supabase";
-import IncomingCallScreen from "../app/IncomingCallScreen";
+import IncomingCallScreen from "../components/call/IncomingCallScreen";
 import useJoinSession from "../components/call/useJoinSession";
 import {
   RING_MS,
