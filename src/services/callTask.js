@@ -91,14 +91,21 @@ function parseIncomingPayload(taskData) {
 }
 
 export async function showCall(payload, { quiet = false } = {}) {
-  if (!payload?.appointmentId)
+  if (!payload?.appointmentId) {
     throw new Error("Incoming call has no appointment ID.");
+  }
+
   const channelId = quiet ? await ensureQuietChannel() : await ensureChannel();
 
-  await notifee.displayNotification({
+  const build = (smallIcon) => ({
     id: callNotificationId(payload.appointmentId),
+
     title: payload.callerName || "Your counselor",
-    body: `Incoming ${payload.mode === "audio" ? "audio" : "video"} session · ${payload.sessionType || "Counseling"}`,
+
+    body: `Incoming ${
+      payload.mode === "audio" ? "audio" : "video"
+    } session · ${payload.sessionType || "Counseling"}`,
+
     data: {
       type: "incoming_call",
       appointmentId: String(payload.appointmentId),
@@ -106,30 +113,65 @@ export async function showCall(payload, { quiet = false } = {}) {
       mode: payload.mode || "video",
       sessionType: payload.sessionType || "Counseling",
     },
+
     android: {
       channelId,
       category: AndroidCategory.CALL,
       importance: quiet ? AndroidImportance.DEFAULT : AndroidImportance.HIGH,
       visibility: AndroidVisibility.PUBLIC,
-      smallIcon: "notification_icon",
+
+      smallIcon,
       color: "#16A34A",
       ongoing: true,
       autoCancel: false,
       timeoutAfter: RING_MS,
       loopSound: true,
-      pressAction: { id: "default", launchActivity: "default" },
+      pressAction: {
+        id: "default",
+        launchActivity: "default",
+      },
       ...(quiet
         ? {}
-        : { fullScreenAction: { id: "default", launchActivity: "default" } }),
+        : {
+            fullScreenAction: {
+              id: "default",
+              launchActivity: "default",
+            },
+          }),
       actions: [
-        { title: "Decline", pressAction: { id: "decline" } },
+        {
+          title: "Decline",
+          pressAction: { id: "decline" },
+        },
         {
           title: "Accept",
-          pressAction: { id: "accept", launchActivity: "default" },
+          pressAction: {
+            id: "accept",
+            launchActivity: "default",
+          },
         },
       ],
     },
   });
+  try {
+    await notifee.displayNotification(build("notification_icon"));
+    console.log("[IncomingCall] Notification displayed with notification_icon");
+  } catch (error) {
+    console.warn(
+      "[IncomingCall] notification_icon failed. Retrying with ic_launcher:",
+      error?.message || error,
+    );
+    try {
+      await notifee.displayNotification(build("ic_launcher"));
+      console.log("[IncomingCall] Notification displayed with ic_launcher");
+    } catch (fallbackError) {
+      console.error(
+        "[IncomingCall] Both notification icons failed:",
+        fallbackError,
+      );
+      throw fallbackError;
+    }
+  }
 }
 
 TaskManager.defineTask(TASK, async ({ data, error }) => {
@@ -138,7 +180,16 @@ TaskManager.defineTask(TASK, async ({ data, error }) => {
   if (!payload) return;
   if (AppState.currentState === "active") return;
 
-  const useOverlay = canDrawOverlays() && !isLocked();
+  const overlayOk = canDrawOverlays();
+  const locked = isLocked();
+  console.log("[IncomingCall] overlay check", {
+    overlayOk,
+    locked,
+    state: AppState.currentState,
+  });
+  const useOverlay = overlayOk && !locked;
+
+  // const useOverlay = canDrawOverlays() && !isLocked();
 
   if (useOverlay) {
     try {
