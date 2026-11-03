@@ -120,7 +120,7 @@ export async function showCall(payload, { quiet = false } = {}) {
       importance: quiet ? AndroidImportance.DEFAULT : AndroidImportance.HIGH,
       visibility: AndroidVisibility.PUBLIC,
 
-      smallIcon,
+      smallIcon: "notification_icon",
       color: "#16A34A",
       ongoing: true,
       autoCancel: false,
@@ -177,8 +177,59 @@ export async function showCall(payload, { quiet = false } = {}) {
 TaskManager.defineTask(TASK, async ({ data, error }) => {
   if (Platform.OS !== "android" || error) return;
   const payload = parseIncomingPayload(data);
-  if (!payload) return;
+  if (!payload?.appointmentId) return;
   if (AppState.currentState === "active") return;
+
+  try {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.user?.id) {
+      console.log(
+        "[IncomingCall] Ignored incoming call: no authenticated session.",
+      );
+      return;
+    }
+
+    const { data: appointment, error: appointmentError } = await supabase
+      .from("appointments")
+      .select("id, client_id, call_status, client_response")
+      .eq("id", payload.appointmentId)
+      .eq("client_id", session.user.id)
+      .maybeSingle();
+
+    if (appointmentError) {
+      console.error(
+        "[IncomingCall] Recipient verification failed:",
+        appointmentError,
+      );
+      return;
+    }
+
+    if (
+      !appointment ||
+      appointment.call_status !== "live" ||
+      appointment.client_response !== "ringing"
+    ) {
+      console.log(
+        "[IncomingCall] Ignored call: appointment does not belong to this account or is no longer ringing.",
+      );
+      return;
+    }
+
+    console.log("[IncomingCall] Recipient verified:", {
+      appointmentId: appointment.id,
+      clientId: session.user.id,
+    });
+  } catch (verificationError) {
+    console.error(
+      "[IncomingCall] Recipient verification error:",
+      verificationError,
+    );
+    return;
+  }
 
   const overlayOk = canDrawOverlays();
   const locked = isLocked();
@@ -188,8 +239,6 @@ TaskManager.defineTask(TASK, async ({ data, error }) => {
     state: AppState.currentState,
   });
   const useOverlay = overlayOk && !locked;
-
-  // const useOverlay = canDrawOverlays() && !isLocked();
 
   if (useOverlay) {
     try {
@@ -346,5 +395,50 @@ export async function registerPushToken(userId) {
     console.log("[PushRegistration] Token saved successfully:", data);
   } catch (error) {
     console.error("[PushRegistration] Registration failed:", error);
+  }
+}
+
+// Remove only this physical device's token from the logging-out account.
+export async function unregisterPushToken(userId) {
+  if (!userId || (Platform.OS !== "android" && Platform.OS !== "ios")) {
+    return;
+  }
+
+  try {
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+
+    if (!projectId) {
+      console.warn(
+        "[PushRegistration] Cannot unregister: missing EAS project ID.",
+      );
+      return;
+    }
+
+    const result = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
+
+    const token = result.data;
+
+    if (!token) {
+      console.warn("[PushRegistration] No device token found during logout.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("push_tokens")
+      .delete()
+      .eq("user_id", userId)
+      .eq("token", token);
+
+    if (error) {
+      console.error("[PushRegistration] Token removal failed:", error);
+      throw error;
+    }
+
+    console.log("[PushRegistration] Device token removed for logged-out user.");
+  } catch (error) {
+    console.error("[PushRegistration] Unregistration failed:", error);
+    throw error;
   }
 }

@@ -60,7 +60,8 @@
         "expo-notifications",
         { "icon": "./assets/images/download.png", "color": "#16A34A" }
       ],
-      "./plugin/withShowWhenLocked"
+      "./plugin/withShowWhenLocked",
+      "./plugin/withNotificationIcon"
     ],
     "experiments": {
       "typedRoutes": true,

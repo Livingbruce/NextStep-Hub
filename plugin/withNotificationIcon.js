@@ -1,0 +1,40 @@
+const { withDangerousMod } = require("@expo/config-plugins");
+const fs = require("fs");
+const path = require("path");
+
+const notificationIcon = `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.9,2 2,2zM18,16v-5c0,-3.07 -1.63,-5.64 -4.5,-6.32V4a1.5,1.5 0,0 0,-3 0v0.68C7.63,5.36 6,7.92 6,11v5l-2,2v1h16v-1z"/>
+</vector>`;
+
+module.exports = function withNotificationIcon(config) {
+  return withDangerousMod(config, [
+    "android",
+    async (config) => {
+      const drawableDir = path.join(
+        config.modRequest.platformProjectRoot,
+        "app",
+        "src",
+        "main",
+        "res",
+        "drawable",
+      );
+
+      fs.mkdirSync(drawableDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(drawableDir, "notification_icon.xml"),
+        notificationIcon,
+      );
+
+      return config;
+    },
+  ]);
+};

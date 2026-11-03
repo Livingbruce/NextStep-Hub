@@ -20,19 +20,18 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import {
-  cancelAppointmentReminders,
-  setupLocalNotifications,
-} from "../../libs/localNotifications";
+import { setupLocalNotifications } from "../../libs/localNotifications";
 import { supabase } from "../../libs/supabase";
 
 import CallModal from "../components/call/CallModal";
 import MiniCallBar from "../components/call/MiniCallBar";
 import Preloader from "../components/preLoader";
 
+import notifee from "@notifee/react-native";
 import { CallProvider } from "../context/CallContext";
 import { IncomingCallProvider } from "../context/IncomingCallContext";
 import { NotificationsProvider } from "../context/NotificationsContext";
+import { unregisterPushToken } from "../services/callTask";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -476,19 +475,42 @@ export default function RootLayout() {
   /**
    * 6. Logout.
    */
-  const logout = useCallback(async () => {
+  const logout = async () => {
+    const loggingOutUserId = user?.id;
+
+    setUser(null);
+
     try {
-      await cancelAppointmentReminders().catch(() => {});
+      if (loggingOutUserId) {
+        try {
+          await unregisterPushToken(loggingOutUserId);
+        } catch (error) {
+          console.warn(
+            "[Auth] Push token cleanup failed during logout:",
+            error,
+          );
+        }
+      }
+      try {
+        await notifee.cancelAllNotifications();
+      } catch (error) {
+        console.warn("[Auth] Could not clear displayed notifications:", error);
+      }
+
+      // await AsyncStorage.removeItem(SESSION_KEY);
 
       const { error } = await supabase.auth.signOut();
 
       if (error) {
+        console.error("[Auth] Supabase sign-out failed:", error);
         throw error;
       }
-    } finally {
-      setUser(null);
+
+      console.log("[Auth] Successfully logged out.");
+    } catch (error) {
+      console.error("[Auth] Logout error:", error);
     }
-  }, []);
+  };
 
   /**
    * 7. Manually refresh approval/suspension status.
