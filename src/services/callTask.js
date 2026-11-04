@@ -14,6 +14,7 @@ import { AppState, Platform } from "react-native";
 import { supabase } from "../../libs/supabase";
 import {
   canDrawOverlays,
+  hideCallOverlay,
   isLocked,
   showCallOverlay,
 } from "../../modules/call-overlay";
@@ -120,7 +121,7 @@ export async function showCall(payload, { quiet = false } = {}) {
       importance: quiet ? AndroidImportance.DEFAULT : AndroidImportance.HIGH,
       visibility: AndroidVisibility.PUBLIC,
 
-      smallIcon: "notification_icon",
+      smallIcon,
       color: "#16A34A",
       ongoing: true,
       autoCancel: false,
@@ -230,6 +231,13 @@ TaskManager.defineTask(TASK, async ({ data, error }) => {
     );
     return;
   }
+
+  console.log("[Overlay Diagnostic]", {
+    canDrawOverlays: canDrawOverlays(),
+    isLocked: isLocked(),
+    showFunctionAvailable: typeof showCallOverlay,
+    hideFunctionAvailable: typeof hideCallOverlay,
+  });
 
   const overlayOk = canDrawOverlays();
   const locked = isLocked();
