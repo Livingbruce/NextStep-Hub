@@ -13,6 +13,7 @@ import {
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../libs/supabase";
+import useJoinSession from "../../components/call/useJoinSession";
 import AnimatedTabs from "../../components/client/appointments/AnimatedTabs";
 import PressableScale from "../../components/client/appointments/PressableScale";
 import { SECTORS } from "../../components/client/careerSectors";
@@ -22,6 +23,7 @@ import { PROGRAMS } from "../../components/client/Programs";
 import CategoryCard from "../../components/client/programs/CategoryCard";
 import EnrolledCard from "../../components/client/programs/EnrolledCard";
 import ProgramsSkeleton from "../../components/client/programs/ProgramSkeleton";
+import { useCall } from "../../context/CallContext";
 import { pg } from "../../styles/(client)/programsUi";
 import { useAuth } from "../_layout";
 
@@ -47,6 +49,9 @@ export default function ProgramsScreen() {
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState("mine");
   const hasLoaded = useRef(false);
+
+  const join = useJoinSession();
+  const { session } = useCall();
 
   // ---- Responsive grid: 1 column on phones, 2 on tablets / landscape ----
   const columns = width >= 720 ? 2 : 1;
@@ -118,26 +123,55 @@ export default function ProgramsScreen() {
     fetchMyPrograms();
   }, [user?.id]);
 
-  const handleOpenAction = (locationType, locationDetails) => {
-    if (!locationDetails) {
-      Alert.alert("Notice", "Meeting details are not yet available.");
+  const handleOpenAction = async (program) => {
+    if (!program) return;
+
+    const type = program.location_type;
+    const details = program.location_details;
+
+    if (type === "physical") {
+      Alert.alert(
+        "Venue details",
+        details || "The venue has not been provided yet.",
+      );
       return;
     }
 
-    if (locationType === "virtual") {
-      const url = locationDetails.startsWith("http")
-        ? locationDetails
-        : `https://${locationDetails}`;
-      Linking.openURL(url).catch(() =>
-        Alert.alert("Error", "Could not open meeting link."),
-      );
-    } else if (locationType === "phone") {
-      const cleanPhone = locationDetails.replace(/[^0-9+]/g, "");
-      Linking.openURL(`tel:${cleanPhone}`).catch(() =>
-        Alert.alert("Error", "Could not initiate call."),
-      );
-    } else {
-      Alert.alert("Venue Details", locationDetails);
+    if (type === "virtual") {
+      if (!details) {
+        Alert.alert(
+          "Meeting link unavailable",
+          "The counselor has not added a meeting link yet.",
+        );
+        return;
+      }
+
+      const url = /^https?:\/\//i.test(details)
+        ? details
+        : `https://${details}`;
+
+      try {
+        await Linking.openURL(url);
+      } catch {
+        Alert.alert(
+          "Unable to open link",
+          "Could not open the external meeting link.",
+        );
+      }
+      return;
+    }
+
+    if (type === "in_app_video" || type === "in_app_audio") {
+      if (!program.id) return;
+
+      await join({
+        kind: "program",
+        roomId: program.id,
+        role: "client",
+        peerName: program.title,
+        subtitle: "Live program",
+        video: type === "in_app_video",
+      });
     }
   };
 

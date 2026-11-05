@@ -7,6 +7,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+
 import { styles } from "../../../styles/(client)/Dashboard";
 import { formatWhen } from "./time";
 
@@ -32,6 +33,20 @@ const LOCATION = {
     actionIcon: "location",
     color: "#475569",
   },
+  in_app_video: {
+    icon: "videocam-outline",
+    label: "In-app video",
+    action: "Join session",
+    actionIcon: "videocam",
+    color: "#15803D",
+  },
+  in_app_audio: {
+    icon: "call-outline",
+    label: "In-app audio",
+    action: "Join session",
+    actionIcon: "call",
+    color: "#15803D",
+  },
 };
 
 export default function EventCard({
@@ -45,6 +60,7 @@ export default function EventCard({
   const loc = LOCATION[program.location_type] || LOCATION.physical;
   const date = new Date(program.starts_at);
   const press = useSharedValue(1);
+
   const anim = useAnimatedStyle(() => ({
     transform: [{ scale: press.get() }],
   }));
@@ -52,6 +68,18 @@ export default function EventCard({
   const fee = program.is_paid
     ? `${program.currency || "KES"} ${Number(program.amount).toLocaleString()}`
     : "Free";
+
+  const isInApp =
+    program.location_type === "in_app_video" ||
+    program.location_type === "in_app_audio";
+
+  const isLive = program.call_status === "live";
+
+  const actionLabel = isInApp
+    ? isLive
+      ? "Join session"
+      : "Waiting for host"
+    : loc.action;
 
   return (
     <Animated.View
@@ -68,15 +96,21 @@ export default function EventCard({
           <View style={styles.dateBlock}>
             <Text style={styles.dateDay}>{date.getDate()}</Text>
             <Text style={styles.dateMonth}>
-              {date.toLocaleString("en-US", { month: "short" }).toUpperCase()}
+              {date
+                .toLocaleString("en-US", {
+                  month: "short",
+                })
+                .toUpperCase()}
             </Text>
           </View>
+
           <View style={{ flex: 1 }}>
             <View style={styles.badgeTag}>
               <Text style={styles.badgeText} numberOfLines={1}>
                 {program.category || "Event"}
               </Text>
             </View>
+
             <Text
               style={[styles.cardTitle, { marginTop: 6 }]}
               numberOfLines={2}
@@ -99,10 +133,12 @@ export default function EventCard({
               {formatWhen(program.starts_at)}
             </Text>
           </View>
+
           <View style={styles.metaPill}>
             <Ionicons name={loc.icon} size={13} color="#64748B" />
             <Text style={styles.metaPillText}>{loc.label}</Text>
           </View>
+
           <View
             style={[
               styles.metaPill,
@@ -126,16 +162,30 @@ export default function EventCard({
         {registered ? (
           <Pressable
             onPress={() => {
+              if (isInApp && !isLive) return;
+
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
                 () => {},
               );
+
               onOpenLocation?.();
             }}
-            style={[styles.primaryButton, { backgroundColor: loc.color }]}
+            disabled={isInApp && !isLive}
+            style={[
+              styles.primaryButton,
+              {
+                backgroundColor: isInApp && !isLive ? "#94A3B8" : loc.color,
+              },
+            ]}
             accessibilityRole="button"
           >
-            <Ionicons name={loc.actionIcon} size={16} color="#FFFFFF" />
-            <Text style={styles.primaryBtnText}>{loc.action}</Text>
+            <Ionicons
+              name={isInApp && !isLive ? "time-outline" : loc.actionIcon}
+              size={16}
+              color="#FFFFFF"
+            />
+
+            <Text style={styles.primaryBtnText}>{actionLabel}</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -143,6 +193,7 @@ export default function EventCard({
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
                 () => {},
               );
+
               onRegister?.();
             }}
             style={styles.primaryButton}

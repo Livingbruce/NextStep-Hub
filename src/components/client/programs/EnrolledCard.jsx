@@ -11,27 +11,10 @@ import PressableScale from "../appointments/PressableScale";
 import { formatWhen, relativeLabel } from "../home/time";
 
 const LOCATION = {
-  virtual: {
-    icon: "videocam-outline",
-    label: "Online",
-    action: "Join meeting",
-    actionIcon: "videocam",
-    color: "#0284C7",
-  },
-  phone: {
-    icon: "call-outline",
-    label: "By phone",
-    action: "Join call",
-    actionIcon: "call",
-    color: "#2563EB",
-  },
-  physical: {
-    icon: "location-outline",
-    label: "In person",
-    action: "View venue",
-    actionIcon: "location",
-    color: "#475569",
-  },
+  physical: { icon: "location-outline", label: "In person" },
+  virtual: { icon: "link-outline", label: "Online meeting" },
+  in_app_video: { icon: "videocam-outline", label: "In-app video" },
+  in_app_audio: { icon: "call-outline", label: "In-app audio" },
 };
 
 export default function EnrolledCard({
@@ -47,6 +30,10 @@ export default function EnrolledCard({
   const loc = LOCATION[program.location_type] || LOCATION.physical;
   const date = new Date(program.starts_at);
   const attended = status === "participated";
+  const inApp = ["in_app_video", "in_app_audio"].includes(
+    program.location_type,
+  );
+
   const fee = program.is_paid
     ? `${program.currency || "KES"} ${Number(program.amount).toLocaleString()}`
     : "Free";
@@ -91,6 +78,7 @@ export default function EnrolledCard({
                 {date.toLocaleString("en-US", { month: "short" }).toUpperCase()}
               </Text>
             </View>
+
             <View style={{ flex: 1 }}>
               <View style={pg.badge}>
                 <Text style={pg.badgeText} numberOfLines={1}>
@@ -114,10 +102,12 @@ export default function EnrolledCard({
               <Ionicons name="time-outline" size={13} color="#64748B" />
               <Text style={pg.pillText}>{formatWhen(program.starts_at)}</Text>
             </View>
+
             <View style={pg.pill}>
               <Ionicons name={loc.icon} size={13} color="#64748B" />
               <Text style={pg.pillText}>{loc.label}</Text>
             </View>
+
             <View
               style={[pg.pill, program.is_paid ? pg.pillPaid : pg.pillFree]}
             >
@@ -154,17 +144,35 @@ export default function EnrolledCard({
               <PressableScale
                 haptic
                 containerStyle={{ flexShrink: 1 }}
-                style={[pg.action, { backgroundColor: loc.color }]}
-                onPress={() =>
-                  onAction(program.location_type, program.location_details)
-                }
+                style={[
+                  pg.action,
+                  {
+                    backgroundColor: inApp
+                      ? "#15803D"
+                      : program.location_type === "virtual"
+                        ? "#0284C7"
+                        : "#475569",
+                  },
+                ]}
+                onPress={() => onAction(program)}
               >
-                <Ionicons name={loc.actionIcon} size={15} color="#FFFFFF" />
+                <Ionicons
+                  name={
+                    inApp
+                      ? "enter-outline"
+                      : program.location_type === "virtual"
+                        ? "open-outline"
+                        : "location"
+                  }
+                  size={15}
+                  color="#FFFFFF"
+                />
                 <Text style={pg.actionText} numberOfLines={1}>
-                  {program.location_type === "physical" &&
-                  program.location_details
-                    ? `Venue: ${program.location_details}`
-                    : loc.action}
+                  {inApp
+                    ? "Join session"
+                    : program.location_type === "virtual"
+                      ? "Join meeting"
+                      : "View venue"}
                 </Text>
               </PressableScale>
             )}
@@ -172,17 +180,16 @@ export default function EnrolledCard({
         </View>
       </PressableScale>
 
-      {/* Full Screen Poster Preview Modal */}
       <Modal
         visible={modalVisible}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}
       >
         <View
           style={{
             flex: 1,
-            backgroundColor: "rgba(0, 0, 0, 0.92)",
+            backgroundColor: "rgba(0,0,0,0.92)",
             justifyContent: "center",
             alignItems: "center",
           }}
@@ -197,7 +204,7 @@ export default function EnrolledCard({
               width: 44,
               height: 44,
               borderRadius: 22,
-              backgroundColor: "rgba(255, 255, 255, 0.2)",
+              backgroundColor: "rgba(255,255,255,0.2)",
               alignItems: "center",
               justifyContent: "center",
             }}
@@ -207,10 +214,7 @@ export default function EnrolledCard({
 
           <Image
             source={{ uri: program.poster_url }}
-            style={{
-              width: "100%",
-              height: "85%",
-            }}
+            style={{ width: "100%", height: "85%" }}
             resizeMode="contain"
           />
         </View>

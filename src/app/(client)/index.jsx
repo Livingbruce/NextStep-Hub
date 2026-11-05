@@ -137,7 +137,7 @@ export default function ClientDashboard() {
       const { data: programData, error: programError } = await supabase
         .from("programs")
         .select(
-          "id, title, category, description, starts_at, location_type, location_details, is_paid, amount, currency",
+          "id, title, category, description, starts_at, location_type, location_details, call_status, call_mode, is_paid, amount, currency",
         )
         .gte("starts_at", new Date().toISOString())
         .order("starts_at", { ascending: true })
@@ -172,25 +172,71 @@ export default function ClientDashboard() {
     fetchDashboardData();
   }, [user?.id]);
 
-  const openLocationAction = (locationType, locationDetails) => {
-    if (!locationDetails) {
-      Alert.alert("Notice", "Meeting details are not yet available.");
+  const handleProgramAction = (program) => {
+    const { id, title, location_type, location_details, call_status } = program;
+
+    // In-app video or audio program
+    if (location_type === "in_app_video" || location_type === "in_app_audio") {
+      if (call_status !== "live") {
+        Alert.alert(
+          "Session not started",
+          "The host has not started this session yet. Please wait until it goes live.",
+        );
+        return;
+      }
+
+      joinInApp({
+        kind: "program",
+        roomId: id,
+        role: "client",
+        peerName: title,
+        subtitle: "Live program",
+        video: location_type === "in_app_video",
+      });
+
       return;
     }
-    if (locationType === "virtual") {
-      const url = locationDetails.startsWith("http")
-        ? locationDetails
-        : `https://${locationDetails}`;
+
+    // External online meeting
+    if (location_type === "virtual") {
+      if (!location_details) {
+        Alert.alert("Notice", "The meeting link is not yet available.");
+        return;
+      }
+
+      const url = location_details.startsWith("http")
+        ? location_details
+        : `https://${location_details}`;
+
       Linking.openURL(url).catch(() =>
-        Alert.alert("Error", "Could not open meeting link."),
+        Alert.alert("Error", "Could not open the meeting link."),
       );
-    } else if (locationType === "phone") {
-      const cleanPhone = locationDetails.replace(/[^0-9+]/g, "");
+
+      return;
+    }
+
+    // Phone-based program
+    if (location_type === "phone") {
+      if (!location_details) {
+        Alert.alert("Notice", "The phone number is not yet available.");
+        return;
+      }
+
+      const cleanPhone = location_details.replace(/[^0-9+]/g, "");
+
       Linking.openURL(`tel:${cleanPhone}`).catch(() =>
-        Alert.alert("Error", "Could not initiate call."),
+        Alert.alert("Error", "Could not initiate the call."),
       );
-    } else {
-      Alert.alert("Venue Location", locationDetails);
+
+      return;
+    }
+
+    // Physical program
+    if (location_type === "physical") {
+      Alert.alert(
+        "Venue Location",
+        location_details || "Venue details are not yet available.",
+      );
     }
   };
 
@@ -360,12 +406,7 @@ export default function ClientDashboard() {
                           },
                         })
                       }
-                      onOpenLocation={() =>
-                        openLocationAction(
-                          program.location_type,
-                          program.location_details,
-                        )
-                      }
+                      onOpenLocation={() => handleProgramAction(program)}
                     />
                   ))}
                 </View>

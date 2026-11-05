@@ -19,15 +19,21 @@ export const LOCATION_TYPES = [
   },
   {
     value: "virtual",
-    label: "Virtual",
-    icon: "videocam-outline",
-    placeholder: "Meeting link (Google Meet, Zoom...)",
+    label: "Online meeting",
+    icon: "link-outline",
+    placeholder: "Meeting link (Zoom, Google Meet, etc.)",
   },
   {
-    value: "phone",
-    label: "Via Phone",
+    value: "in_app_video",
+    label: "In-app video",
+    icon: "videocam-outline",
+    placeholder: "",
+  },
+  {
+    value: "in_app_audio",
+    label: "In-app audio",
     icon: "call-outline",
-    placeholder: "Phone number or dial-in details",
+    placeholder: "",
   },
 ];
 
@@ -38,6 +44,7 @@ export default function CounselorProgramCard({
   onEdit,
   onDelete,
   onViewParticipants,
+  onGoLive,
   style,
 }) {
   const [modalVisible, setModalVisible] = useState(false);
@@ -46,6 +53,8 @@ export default function CounselorProgramCard({
   const attended = program.participants.filter(
     (p) => p.status === "Participated",
   ).length;
+
+  const inApp = ["in_app_video", "in_app_audio"].includes(program.locationType);
 
   return (
     <Animated.View
@@ -58,12 +67,7 @@ export default function CounselorProgramCard({
       style={[cp.card, past && cp.cardPast, style]}
     >
       {!!program.posterUrl && (
-        <PressableScale
-          onPress={(e) => {
-            e.stopPropagation?.();
-            setModalVisible(true);
-          }}
-        >
+        <PressableScale onPress={() => setModalVisible(true)}>
           <Image
             source={{ uri: program.posterUrl }}
             style={cp.poster}
@@ -80,6 +84,7 @@ export default function CounselorProgramCard({
               {date.toLocaleString("en-US", { month: "short" }).toUpperCase()}
             </Text>
           </View>
+
           <View style={{ flex: 1 }}>
             <View style={cp.badge}>
               <Text style={cp.badgeText} numberOfLines={1}>
@@ -107,12 +112,19 @@ export default function CounselorProgramCard({
                 : `${formatWhen(program.startsAt)} · ${relativeLabel(program.startsAt, Date.now())}`}
             </Text>
           </View>
+
           <View style={cp.pill}>
-            <Ionicons name={loc?.icon} size={13} color="#64748B" />
+            <Ionicons
+              name={loc?.icon || "location-outline"}
+              size={13}
+              color="#64748B"
+            />
             <Text style={cp.pillText} numberOfLines={1}>
-              {loc?.label}: {program.locationDetails}
+              {loc?.label || "Physical"}
+              {program.locationDetails ? `: ${program.locationDetails}` : ""}
             </Text>
           </View>
+
           <View style={[cp.pill, program.isPaid ? cp.pillPaid : cp.pillFree]}>
             <Text
               style={[
@@ -128,6 +140,7 @@ export default function CounselorProgramCard({
                 : "Free"}
             </Text>
           </View>
+
           {program.moderators.length > 0 && (
             <View style={cp.pill}>
               <Ionicons
@@ -136,8 +149,7 @@ export default function CounselorProgramCard({
                 color="#64748B"
               />
               <Text style={cp.pillText}>
-                {program.moderators.length}{" "}
-                {program.moderators.length === 1 ? "moderator" : "moderators"}
+                {program.moderators.length} moderator(s)
               </Text>
             </View>
           )}
@@ -157,36 +169,54 @@ export default function CounselorProgramCard({
                 : `Participants (${program.participants.length})`}
             </Text>
           </PressableScale>
-          <PressableScale
-            haptic
-            style={cp.iconBtn}
-            onPress={onEdit}
-            accessibilityLabel="Edit program"
-          >
+
+          {!past && inApp && (
+            <PressableScale
+              haptic
+              style={[
+                cp.iconBtn,
+                { backgroundColor: "#DCFCE7", paddingHorizontal: 12 },
+              ]}
+              onPress={onGoLive}
+              accessibilityLabel="Start or rejoin in-app session"
+            >
+              <Ionicons
+                name={
+                  program.locationType === "in_app_video" ? "videocam" : "call"
+                }
+                size={18}
+                color="#15803D"
+              />
+              <Text
+                style={{ color: "#15803D", fontWeight: "800", fontSize: 12 }}
+              >
+                {program.locationType === "in_app_video"
+                  ? "Go live"
+                  : "Start call"}
+              </Text>
+            </PressableScale>
+          )}
+
+          <PressableScale haptic style={cp.iconBtn} onPress={onEdit}>
             <Ionicons name="pencil-outline" size={18} color="#0284C7" />
           </PressableScale>
-          <PressableScale
-            haptic
-            style={cp.iconBtn}
-            onPress={onDelete}
-            accessibilityLabel="Delete program"
-          >
+
+          <PressableScale haptic style={cp.iconBtn} onPress={onDelete}>
             <Ionicons name="trash-outline" size={18} color="#EF4444" />
           </PressableScale>
         </View>
       </View>
 
-      {/* Full Screen Poster Preview Modal */}
       <Modal
         visible={modalVisible}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}
       >
         <View
           style={{
             flex: 1,
-            backgroundColor: "rgba(0, 0, 0, 0.92)",
+            backgroundColor: "rgba(0,0,0,0.92)",
             justifyContent: "center",
             alignItems: "center",
           }}
@@ -201,7 +231,7 @@ export default function CounselorProgramCard({
               width: 44,
               height: 44,
               borderRadius: 22,
-              backgroundColor: "rgba(255, 255, 255, 0.2)",
+              backgroundColor: "rgba(255,255,255,0.2)",
               alignItems: "center",
               justifyContent: "center",
             }}
@@ -211,10 +241,7 @@ export default function CounselorProgramCard({
 
           <Image
             source={{ uri: program.posterUrl }}
-            style={{
-              width: "100%",
-              height: "85%",
-            }}
+            style={{ width: "100%", height: "85%" }}
             resizeMode="contain"
           />
         </View>

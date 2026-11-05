@@ -195,21 +195,20 @@ export default function Programs() {
   /* ------------------------------------------------------------------ */
 
   const start = useCallback(
-    async (program, video) => {
+    async (program) => {
       if (!program?.id) {
-        Alert.alert(
-          "Unable to start session",
-          "This program does not have a valid ID.",
-        );
+        Alert.alert("Unable to start session", "Invalid program ID.");
         return;
       }
+
+      const video = program.locationType === "in_app_video";
 
       await join({
         kind: "program",
         roomId: program.id,
         role: "counselor",
         peerName: program.title,
-        subtitle: "Live event",
+        subtitle: "Live program",
         video,
       });
     },
@@ -218,20 +217,7 @@ export default function Programs() {
 
   const goLive = useCallback(
     (program) => {
-      Alert.alert("Go live", `Host "${program.title}" in the app as:`, [
-        {
-          text: "Audio",
-          onPress: () => start(program, false),
-        },
-        {
-          text: "Video",
-          onPress: () => start(program, true),
-        },
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-      ]);
+      start(program);
     },
     [start],
   );
@@ -282,35 +268,23 @@ export default function Programs() {
         posterPath = null;
         removeOld = !!oldPath;
       }
-
-      /*
-       * Normalize delivery mode.
-       *
-       * physical: no virtual room or meeting link.
-       * online: external meeting link.
-       * in_app: Agora group session.
-       *
-       * The form component must supply these values.
-       */
       const locationType = form.locationType || "physical";
 
       const locationDetails =
-        locationType === "physical"
+        locationType === "physical" || locationType === "virtual"
           ? (form.locationDetails || "").trim()
-          : locationType === "online"
-            ? (form.locationDetails || "").trim()
-            : "";
-
-      if (locationType === "online" && !locationDetails) {
-        Alert.alert(
-          "Meeting link required",
-          "Enter the online meeting link before saving.",
-        );
-        return;
-      }
+          : "";
 
       if (locationType === "physical" && !locationDetails) {
         Alert.alert("Venue required", "Enter the physical venue or address.");
+        return;
+      }
+
+      if (locationType === "virtual" && !locationDetails) {
+        Alert.alert(
+          "Meeting link required",
+          "Enter the external meeting link.",
+        );
         return;
       }
 

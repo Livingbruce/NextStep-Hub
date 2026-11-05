@@ -193,21 +193,43 @@ function Body({ program, saving, onClose, onSubmit }) {
 
   const validate = () => {
     if (!title.trim()) return "Please enter the program title.";
-    if (!editing && startsAt < new Date())
+
+    if (!editing && startsAt < new Date()) {
       return "Please choose a future date and time.";
-    if (!locationDetails.trim())
-      return "Please enter the venue, meeting link or phone details.";
-    if (isPaid && !(parseFloat(amount) > 0))
+    }
+
+    if (locationType === "physical" && !locationDetails.trim()) {
+      return "Please enter the physical venue or address.";
+    }
+
+    if (locationType === "virtual") {
+      if (!locationDetails.trim()) {
+        return "Please enter the external meeting link.";
+      }
+
+      const link = locationDetails.trim();
+      if (!/^https?:\/\/|^[\w-]+(\.[\w-]+)+/.test(link)) {
+        return "Enter a valid meeting link.";
+      }
+    }
+
+    if (isPaid && !(parseFloat(amount) > 0)) {
       return "Please enter a valid amount for this paid program.";
+    }
+
     for (let i = 0; i < mods.length; i++) {
       const m = mods[i];
       const l = `Moderator ${i + 1}`;
+
       if (!m.name.trim()) return `${l}: name is required.`;
-      if (!EMAIL_REGEX.test(m.email.trim()))
+      if (!EMAIL_REGEX.test(m.email.trim())) {
         return `${l}: enter a valid email address.`;
-      if (m.phone.replace(/\D/g, "").length < 9)
+      }
+      if (m.phone.replace(/\D/g, "").length < 9) {
         return `${l}: enter a valid phone number.`;
+      }
     }
+
     return null;
   };
 
@@ -276,30 +298,42 @@ function Body({ program, saving, onClose, onSubmit }) {
           </View>
         )}
 
-        <Text style={cp.label}>Location type *</Text>
+        <Text style={cp.label}>Program delivery method *</Text>
+
         <Segments
           options={LOCATION_TYPES}
           value={locationType}
           onChange={(v) => {
-            if (v !== locationType) {
-              setLocationType(v);
-              setLocationDetails("");
-            }
+            setLocationType(v);
+            setLocationDetails("");
           }}
         />
-        <Input
-          placeholder={activeLoc?.placeholder}
-          value={locationDetails}
-          onChangeText={setLocationDetails}
-          autoCapitalize="none"
-          keyboardType={
-            locationType === "phone"
-              ? "phone-pad"
-              : locationType === "virtual"
-                ? "url"
-                : "default"
-          }
-        />
+
+        {(locationType === "physical" || locationType === "virtual") && (
+          <Input
+            placeholder={
+              locationType === "physical"
+                ? "Enter venue or physical address"
+                : "Paste Zoom, Google Meet or other meeting link"
+            }
+            value={locationDetails}
+            onChangeText={setLocationDetails}
+            autoCapitalize="none"
+            keyboardType={locationType === "virtual" ? "url" : "default"}
+          />
+        )}
+
+        {locationType === "in_app_video" && (
+          <Text style={{ color: "#64748B", fontSize: 12, marginBottom: 14 }}>
+            Clients will join a video session directly inside the app.
+          </Text>
+        )}
+
+        {locationType === "in_app_audio" && (
+          <Text style={{ color: "#64748B", fontSize: 12, marginBottom: 14 }}>
+            Clients will join an audio-only session directly inside the app.
+          </Text>
+        )}
 
         <Text style={cp.label}>Attendance fee *</Text>
         <Segments
