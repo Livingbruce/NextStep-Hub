@@ -12,19 +12,22 @@ import {
 } from "react-native";
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+
 import { NOTIFICATION_TYPES, notifyAdmins } from "../../../libs/notifications";
 import { supabase } from "../../../libs/supabase";
+
+import useJoinSession from "../../components/call/useJoinSession";
 import AnimatedTabs from "../../components/client/appointments/AnimatedTabs";
 import PressableScale from "../../components/client/appointments/PressableScale";
 import ProgramsSkeleton from "../../components/client/programs/ProgramSkeleton";
 import CounselorProgramCard from "../../components/counselor/programs/CounselorProgramCard";
 import ParticipantsModal from "../../components/counselor/programs/ParticipantsModal";
 import ProgramFormModal from "../../components/counselor/programs/ProgramFormModal";
+
 import { cp } from "../../styles/(counselor)/programsUi";
 
 const GAP = 16;
 
-// Convert a database row into the shape the screen uses
 const mapProgram = (row) => ({
   id: row.id,
   createdBy: row.created_by,
@@ -32,22 +35,30 @@ const mapProgram = (row) => ({
   category: row.category,
   description: row.description || "",
   startsAt: row.starts_at,
-  locationType: row.location_type,
-  locationDetails: row.location_details,
+
+  // Supported delivery types:
+  // physical | online | in_app
+  locationType: row.location_type || "physical",
+  locationDetails: row.location_details || "",
+
   isPaid: row.is_paid,
   amount: row.amount,
   currency: row.currency || "KES",
   posterUrl: row.poster_url,
   posterPath: row.poster_path,
+
   status: new Date(row.starts_at) >= new Date() ? "Available" : "Past",
+
   moderators: (row.program_moderators || []).map((m) => ({
     id: m.id,
     name: m.full_name,
     email: m.email,
     phone: m.phone_no,
   })),
+
   participants: (row.program_participants || []).map((p) => {
     const c = Array.isArray(p.client) ? p.client[0] : p.client;
+
     return {
       id: p.id,
       name:
@@ -64,8 +75,11 @@ const mapProgram = (row) => ({
 
 export default function Programs() {
   const { width } = useWindowDimensions();
+
   const cols = width >= 720 ? 2 : 1;
   const itemWidth = cols === 2 ? "48.5%" : "100%";
+
+  const join = useJoinSession();
 
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,9 +91,8 @@ export default function Programs() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const buzz = (t) => Haptics.notificationAsync(t).catch(() => {});
+  const buzz = (type) => Haptics.notificationAsync(type).catch(() => {});
 
-  /* ------------------------------- data ------------------------------- */
   const fetchPrograms = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -87,24 +100,38 @@ export default function Programs() {
         .select(
           `
           *,
-          program_moderators ( id, full_name, email, phone_no ),
+          program_moderators (
+            id,
+            full_name,
+            email,
+            phone_no
+          ),
           program_participants (
             id,
             status,
             client:profiles!program_participants_client_id_fkey (
-              id, full_name, first_name, surname, email, phone_no, county
+              id,
+              full_name,
+              first_name,
+              surname,
+              email,
+              phone_no,
+              county
             )
           )
         `,
         )
         .order("starts_at", { ascending: true });
+
       if (error) throw error;
+
       setPrograms((data || []).map(mapProgram));
-    } catch (e) {
-      console.error("Fetch programs error:", e);
+    } catch (error) {
+      console.error("Fetch programs error:", error);
+
       Alert.alert(
         "Couldn't load programs",
-        e?.message || "Pull down to try again.",
+        error?.message || "Pull down to try again.",
       );
     } finally {
       setLoading(false);
@@ -125,6 +152,7 @@ export default function Programs() {
     () => programs.filter((p) => p.status === "Available"),
     [programs],
   );
+
   const past = useMemo(
     () =>
       programs
@@ -132,30 +160,91 @@ export default function Programs() {
         .sort((a, b) => new Date(b.startsAt) - new Date(a.startsAt)),
     [programs],
   );
+
   const selected = programs.find((p) => p.id === participantsId);
 
   const tabs = [
-    { key: "upcoming", label: "Upcoming", count: available.length },
-    { key: "past", label: "Past", count: past.length },
+    {
+      key: "upcoming",
+      label: "Upcoming",
+      count: available.length,
+    },
+    {
+      key: "past",
+      label: "Past",
+      count: past.length,
+    },
   ];
 
-  /* ------------------------------- save ------------------------------- */
+  /* ------------------------------------------------------------------ */
+  /* CREATE / EDIT                                                      */
+  /* ------------------------------------------------------------------ */
+
   const openCreate = () => {
     setEditing(null);
     setFormOpen(true);
   };
-  const openEdit = (p) => {
-    setEditing(p);
+
+  const openEdit = (program) => {
+    setEditing(program);
     setFormOpen(true);
   };
+
+  /* ------------------------------------------------------------------ */
+  /* LIVE PROGRAM ENTRY POINT                                           */
+  /* ------------------------------------------------------------------ */
+
+  const start = useCallback(
+    async (program, video) => {
+      if (!program?.id) {
+        Alert.alert(
+          "Unable to start session",
+          "This program does not have a valid ID.",
+        );
+        return;
+      }
+
+      await join({
+        kind: "program",
+        roomId: program.id,
+        role: "counselor",
+        peerName: program.title,
+        subtitle: "Live event",
+        video,
+      });
+    },
+    [join],
+  );
+
+  const goLive = useCallback(
+    (program) => {
+      Alert.alert("Go live", `Host "${program.title}" in the app as:`, [
+        {
+          text: "Audio",
+          onPress: () => start(program, false),
+        },
+        {
+          text: "Video",
+          onPress: () => start(program, true),
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]);
+    },
+    [start],
+  );
 
   const handleSave = async (form) => {
     try {
       setSaving(true);
+
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
+
       if (userError || !user) {
         Alert.alert(
           "Authentication error",
@@ -164,23 +253,28 @@ export default function Programs() {
         return;
       }
 
-      // ---- Poster ----
+      /* Poster upload */
       const oldPath = editing?.posterPath || null;
+
       let posterUrl = editing?.posterUrl || null;
       let posterPath = oldPath;
       let removeOld = false;
 
       if (form.poster?.isNew) {
         const path = `${user.id}/${Date.now()}.${form.poster.ext}`;
-        const { error: upErr } = await supabase.storage
+
+        const { error: uploadError } = await supabase.storage
           .from("posters")
           .upload(path, decode(form.poster.base64), {
             contentType: `image/${form.poster.ext}`,
             upsert: false,
           });
-        if (upErr) throw upErr;
+
+        if (uploadError) throw uploadError;
+
         posterUrl = supabase.storage.from("posters").getPublicUrl(path)
           .data.publicUrl;
+
         posterPath = path;
         removeOld = !!oldPath;
       } else if (!form.poster) {
@@ -189,64 +283,112 @@ export default function Programs() {
         removeOld = !!oldPath;
       }
 
+      /*
+       * Normalize delivery mode.
+       *
+       * physical: no virtual room or meeting link.
+       * online: external meeting link.
+       * in_app: Agora group session.
+       *
+       * The form component must supply these values.
+       */
+      const locationType = form.locationType || "physical";
+
+      const locationDetails =
+        locationType === "physical"
+          ? (form.locationDetails || "").trim()
+          : locationType === "online"
+            ? (form.locationDetails || "").trim()
+            : "";
+
+      if (locationType === "online" && !locationDetails) {
+        Alert.alert(
+          "Meeting link required",
+          "Enter the online meeting link before saving.",
+        );
+        return;
+      }
+
+      if (locationType === "physical" && !locationDetails) {
+        Alert.alert("Venue required", "Enter the physical venue or address.");
+        return;
+      }
+
       const payload = {
         title: form.title.trim(),
         category: form.category.trim() || "General Mentorship",
         description: form.description.trim() || null,
         starts_at: form.startsAt.toISOString(),
-        location_type: form.locationType,
-        location_details: form.locationDetails.trim(),
+
+        location_type: locationType,
+        location_details: locationDetails || null,
+
         is_paid: form.isPaid,
         amount: form.isPaid ? parseFloat(form.amount) : null,
+
         poster_url: posterUrl,
         poster_path: posterPath,
         moderator_count: form.moderators.length,
       };
 
       let programId = editing?.id;
+
       if (editing) {
         const { data, error } = await supabase
           .from("programs")
           .update(payload)
           .eq("id", editing.id)
           .select("id");
+
         if (error) throw error;
-        if (!data?.length)
+
+        if (!data?.length) {
           throw new Error("You do not have permission to edit this program.");
+        }
       } else {
         const { data, error } = await supabase
           .from("programs")
-          .insert({ ...payload, created_by: user.id })
+          .insert({
+            ...payload,
+            created_by: user.id,
+          })
           .select("id")
           .single();
+
         if (error) throw error;
+
         programId = data.id;
       }
 
-      // ---- Moderators (replace full list) ----
+      /* Replace moderators */
       if (editing) {
         const { error } = await supabase
           .from("program_moderators")
           .delete()
           .eq("program_id", programId);
-        if (error) throw error;
-      }
-      if (form.moderators.length > 0) {
-        const { error } = await supabase.from("program_moderators").insert(
-          form.moderators.map((m) => ({
-            program_id: programId,
-            full_name: m.name.trim(),
-            email: m.email.trim().toLowerCase(),
-            phone_no: m.phone.trim(),
-          })),
-        );
+
         if (error) throw error;
       }
 
+      if (form.moderators.length > 0) {
+        const { error } = await supabase.from("program_moderators").insert(
+          form.moderators.map((moderator) => ({
+            program_id: programId,
+            full_name: moderator.name.trim(),
+            email: moderator.email.trim().toLowerCase(),
+            phone_no: moderator.phone.trim(),
+          })),
+        );
+
+        if (error) throw error;
+      }
+
+      /* Remove replaced poster */
       if (removeOld && oldPath) {
         await supabase.storage.from("posters").remove([oldPath]);
       }
 
+      /* Notify admins about new programs */
       if (!editing) {
         await notifyAdmins({
           type: NOTIFICATION_TYPES.NEW_PROGRAM,
@@ -257,23 +399,32 @@ export default function Programs() {
       }
 
       buzz(Haptics.NotificationFeedbackType.Success);
+
       setFormOpen(false);
       await fetchPrograms();
-    } catch (e) {
-      console.error("Save program error:", e);
+    } catch (error) {
+      console.error("Save program error:", error);
+
       buzz(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Save failed", e?.message || "Could not save the program.");
+
+      Alert.alert(
+        "Save failed",
+        error?.message || "Could not save the program.",
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = (prog) => {
+  const handleDelete = (program) => {
     Alert.alert(
       "Delete program",
       "Its participants and moderators will be removed too.",
       [
-        { text: "Cancel", style: "cancel" },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
         {
           text: "Delete",
           style: "destructive",
@@ -282,23 +433,33 @@ export default function Programs() {
               const { data, error } = await supabase
                 .from("programs")
                 .delete()
-                .eq("id", prog.id)
+                .eq("id", program.id)
                 .select("id");
+
               if (error) throw error;
-              if (!data?.length)
+
+              if (!data?.length) {
                 throw new Error(
                   "You do not have permission to delete this program.",
                 );
-              if (prog.posterPath) {
+              }
+
+              if (program.posterPath) {
                 await supabase.storage
                   .from("posters")
-                  .remove([prog.posterPath]);
+                  .remove([program.posterPath]);
               }
-              // Removing from state plays the card's exit + reflow animation.
-              setPrograms((prev) => prev.filter((p) => p.id !== prog.id));
+
+              setPrograms((previous) =>
+                previous.filter((p) => p.id !== program.id),
+              );
+
               buzz(Haptics.NotificationFeedbackType.Success);
-            } catch (e) {
-              Alert.alert("Delete failed", e?.message || "Please try again.");
+            } catch (error) {
+              Alert.alert(
+                "Delete failed",
+                error?.message || "Please try again.",
+              );
             }
           },
         },
@@ -306,7 +467,6 @@ export default function Programs() {
     );
   };
 
-  /* ---------------------------- participants ---------------------------- */
   const handleMark = async (id) => {
     try {
       const { data, error } = await supabase
@@ -314,12 +474,17 @@ export default function Programs() {
         .update({ status: "participated" })
         .eq("id", id)
         .select("id");
+
       if (error) throw error;
-      if (!data?.length) throw new Error("Could not update this participant.");
+
+      if (!data?.length) {
+        throw new Error("Could not update this participant.");
+      }
+
       buzz(Haptics.NotificationFeedbackType.Success);
       fetchPrograms();
-    } catch (e) {
-      Alert.alert("Update failed", e?.message || "Please try again.");
+    } catch (error) {
+      Alert.alert("Update failed", error?.message || "Please try again.");
     }
   };
 
@@ -328,7 +493,10 @@ export default function Programs() {
       "Remove participant",
       "Remove this client from the registered list?",
       [
-        { text: "Cancel", style: "cancel" },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
         {
           text: "Remove",
           style: "destructive",
@@ -339,12 +507,19 @@ export default function Programs() {
                 .delete()
                 .eq("id", id)
                 .select("id");
+
               if (error) throw error;
-              if (!data?.length)
+
+              if (!data?.length) {
                 throw new Error("Could not remove this participant.");
+              }
+
               fetchPrograms();
-            } catch (e) {
-              Alert.alert("Remove failed", e?.message || "Please try again.");
+            } catch (error) {
+              Alert.alert(
+                "Remove failed",
+                error?.message || "Please try again.",
+              );
             }
           },
         },
@@ -352,8 +527,8 @@ export default function Programs() {
     );
   };
 
-  /* ------------------------------ render ------------------------------ */
   const rows = tab === "upcoming" ? available : past;
+
   const isPast = tab === "past";
 
   const body = loading ? (
@@ -370,14 +545,17 @@ export default function Programs() {
           color="#1E3A8A"
         />
       </Animated.View>
+
       <Animated.Text entering={FadeIn.delay(150)} style={cp.emptyTitle}>
         {isPast ? "No past programs" : "No upcoming programs"}
       </Animated.Text>
+
       <Animated.Text entering={FadeIn.delay(220)} style={cp.emptyText}>
         {isPast
           ? "Programs you've run will be archived here."
           : "Create a workshop or mentorship event for clients to join."}
       </Animated.Text>
+
       {!isPast && (
         <PressableScale haptic style={cp.newBtn} onPress={openCreate}>
           <Ionicons name="add" size={18} color="#FFFFFF" />
@@ -387,16 +565,17 @@ export default function Programs() {
     </View>
   ) : (
     <View key={tab} style={[cp.grid, { gap: GAP }]}>
-      {rows.map((p, i) => (
+      {rows.map((program, index) => (
         <CounselorProgramCard
-          key={p.id}
-          program={p}
-          index={i}
+          key={program.id}
+          program={program}
+          index={index}
           past={isPast}
           style={{ width: itemWidth }}
-          onEdit={() => openEdit(p)}
-          onDelete={() => handleDelete(p)}
-          onViewParticipants={() => setParticipantsId(p.id)}
+          onEdit={() => openEdit(program)}
+          onDelete={() => handleDelete(program)}
+          onViewParticipants={() => setParticipantsId(program.id)}
+          onGoLive={() => goLive(program)}
         />
       ))}
     </View>
@@ -420,10 +599,12 @@ export default function Programs() {
           <View style={cp.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={cp.title}>Mentorship programs</Text>
+
               <Text style={cp.subtitle}>
                 Create events and track attendance
               </Text>
             </View>
+
             <PressableScale haptic style={cp.newBtn} onPress={openCreate}>
               <Ionicons name="add" size={18} color="#FFFFFF" />
               <Text style={cp.newBtnText}>New</Text>

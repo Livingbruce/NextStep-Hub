@@ -6,7 +6,8 @@ export default function useJoinSession() {
   const { session, startCall, expand } = useCall();
   return useCallback(
     async (opts) => {
-      if (session?.appointmentId === opts.appointmentId) return expand();
+      const key = opts.roomId ?? opts.appointmentId;
+      if (session?.roomId === key) return expand();
       if (session) {
         Alert.alert(
           "Call in progress",
