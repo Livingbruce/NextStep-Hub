@@ -9,6 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { styles } from "../../../styles/(client)/Dashboard";
+import { totalDays } from "../../counselor/programs/schedule";
 import { formatWhen } from "./time";
 
 const LOCATION = {
@@ -133,6 +134,13 @@ export default function EventCard({
               {formatWhen(program.starts_at)}
             </Text>
           </View>
+
+          {totalDays(program) > 1 && (
+            <View style={styles.metaPill}>
+              <Ionicons name="layers-outline" size={13} color="#64748B" />
+              <Text style={styles.metaPillText}>{totalDays(program)} days</Text>
+            </View>
+          )}
 
           <View style={styles.metaPill}>
             <Ionicons name={loc.icon} size={13} color="#64748B" />

@@ -9,6 +9,8 @@ import Animated, {
 import { cp } from "../../../styles/(counselor)/programsUi";
 import PressableScale from "../../client/appointments/PressableScale";
 import { formatWhen, relativeLabel } from "../../client/home/time";
+import Timetable from "./Timetable";
+import { fmtTimeOnly, getSlots } from "./schedule";
 
 export const LOCATION_TYPES = [
   {
@@ -48,6 +50,11 @@ export default function CounselorProgramCard({
   style,
 }) {
   const [modalVisible, setModalVisible] = useState(false);
+
+  const [showTable, setShowTable] = useState(false);
+  const multiDay = (program.totalDays || 1) > 1;
+  const slots = getSlots(program);
+
   const date = new Date(program.startsAt);
   const loc = LOCATION_TYPES.find((l) => l.value === program.locationType);
   const attended = program.participants.filter(
@@ -113,6 +120,22 @@ export default function CounselorProgramCard({
             </Text>
           </View>
 
+          {multiDay && (
+            <View
+              style={[
+                cp.pill,
+                { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" },
+              ]}
+            >
+              <Ionicons name="layers-outline" size={13} color="#1E3A8A" />
+              <Text
+                style={[cp.pillText, { color: "#1E3A8A", fontWeight: "800" }]}
+              >
+                {program.totalDays} days
+              </Text>
+            </View>
+          )}
+
           <View style={cp.pill}>
             <Ionicons
               name={loc?.icon || "location-outline"}
@@ -154,6 +177,35 @@ export default function CounselorProgramCard({
             </View>
           )}
         </View>
+
+        {multiDay && (
+          <>
+            <PressableScale
+              onPress={() => setShowTable((v) => !v)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                marginTop: 12,
+                alignSelf: "flex-start",
+              }}
+            >
+              <Text
+                style={{ fontSize: 12, fontWeight: "800", color: "#2563EB" }}
+              >
+                {showTable
+                  ? "Hide timetable"
+                  : `View timetable (${fmtTimeOnly(slots[0].start)} – ${fmtTimeOnly(slots[0].end)})`}
+              </Text>
+              <Ionicons
+                name={showTable ? "chevron-up" : "chevron-down"}
+                size={14}
+                color="#2563EB"
+              />
+            </PressableScale>
+            {showTable && <Timetable program={program} />}
+          </>
+        )}
 
         <View style={cp.foot}>
           <PressableScale

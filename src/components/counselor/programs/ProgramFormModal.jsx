@@ -12,6 +12,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   View,
@@ -25,8 +26,18 @@ import Animated, {
 import { cp } from "../../../styles/(counselor)/programsUi";
 import PressableScale from "../../client/appointments/PressableScale";
 import { LOCATION_TYPES } from "./CounselorProgramCard";
+import { getSlots } from "./schedule";
 
 const MAX_MODERATORS = 10;
+const MAX_DAYS = 90;
+const DAY_PRESETS = [
+  { label: "1 day", n: 1 },
+  { label: "3 days", n: 3 },
+  { label: "5 days", n: 5 },
+  { label: "1 week", n: 7 },
+  { label: "2 weeks", n: 14 },
+  { label: "1 month", n: 30 },
+];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const emptyModerator = () => ({ name: "", email: "", phone: "" });
 
@@ -46,6 +57,30 @@ const fmt = (v) =>
     minute: "2-digit",
   });
 
+const fmtT = (v) =>
+  new Date(v).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+// Put the hours/minutes of `t` onto the calendar day of `day`.
+const dayEnd = (day, t) => {
+  const d = new Date(day);
+  d.setHours(t.getHours(), t.getMinutes(), 0, 0);
+  return d;
+};
+
+// The i-th session day after `start` (optionally skipping Sat/Sun).
+const nthDay = (start, i, skipWeekends) => {
+  const d = new Date(start);
+  let count = 0;
+  while (count < i) {
+    d.setDate(d.getDate() + 1);
+    if (!skipWeekends || (d.getDay() !== 0 && d.getDay() !== 6)) count++;
+  }
+  return d;
+};
+
 function Input({ style, ...props }) {
   const [focus, setFocus] = useState(false);
   return (
@@ -60,9 +95,14 @@ function Input({ style, ...props }) {
   );
 }
 
+// Responsive tiles: 4 across when the sheet is wide, otherwise 2 across.
 function Segments({ options, value, onChange }) {
+  const [w, setW] = useState(0);
+  const cols = w >= 460 ? Math.min(options.length, 4) : 2;
+  const basis = `${Math.floor(100 / cols) - 2}%`;
+
   return (
-    <View style={cp.segRow}>
+    <View style={cp.segGrid} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
       {options.map((o) => {
         const on = value === o.value;
         return (
@@ -70,16 +110,21 @@ function Segments({ options, value, onChange }) {
             key={String(o.value)}
             haptic
             scaleTo={0.95}
-            containerStyle={{ flex: 1 }}
-            style={[cp.seg, on && cp.segOn]}
+            containerStyle={{ flexBasis: basis, flexGrow: 1, minWidth: 100 }}
+            style={[cp.segTile, on && cp.segOn]}
             onPress={() => onChange(o.value)}
           >
             <Ionicons
               name={o.icon}
-              size={16}
+              size={20}
               color={on ? "#FFFFFF" : "#64748B"}
             />
-            <Text style={[cp.segText, on && cp.segTextOn]}>{o.label}</Text>
+            <Text
+              style={[cp.segTileText, on && cp.segTileTextOn]}
+              numberOfLines={2}
+            >
+              {o.label}
+            </Text>
           </PressableScale>
         );
       })}
@@ -87,14 +132,96 @@ function Segments({ options, value, onChange }) {
   );
 }
 
+// mode: "datetime" | "time"
+function PickerField({ label, value, mode, onChange, minimumDate }) {
+  const icon = mode === "time" ? "time-outline" : "calendar-outline";
+
+  const openAndroid = () => {
+    if (mode === "time") {
+      DateTimePickerAndroid.open({
+        value,
+        mode: "time",
+        onChange: (e, t) => e.type === "set" && t && onChange(t),
+      });
+      return;
+    }
+    DateTimePickerAndroid.open({
+      value,
+      mode: "date",
+      minimumDate,
+      onChange: (e, date) => {
+        if (e.type !== "set" || !date) return;
+        DateTimePickerAndroid.open({
+          value: date,
+          mode: "time",
+          onChange: (te, time) => {
+            if (te.type !== "set" || !time) return;
+            const c = new Date(date);
+            c.setHours(time.getHours(), time.getMinutes(), 0, 0);
+            onChange(c);
+          },
+        });
+      },
+    });
+  };
+
+  return (
+    <View style={cp.pickerCol}>
+      <Text style={cp.subLabel}>{label}</Text>
+      {Platform.OS === "android" ? (
+        <PressableScale style={cp.pickerBtn} onPress={openAndroid}>
+          <Ionicons name={icon} size={18} color="#1E3A8A" />
+          <Text style={cp.pickerText} numberOfLines={1}>
+            {mode === "time" ? fmtT(value) : fmt(value)}
+          </Text>
+        </PressableScale>
+      ) : (
+        <View style={{ alignItems: "flex-start" }}>
+          <DateTimePicker
+            value={value}
+            mode={mode}
+            display="compact"
+            minimumDate={minimumDate}
+            onChange={(_, s) => s && onChange(s)}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
+
 function Body({ program, saving, onClose, onSubmit }) {
   const editing = !!program;
+
+  // Seed schedule when editing
+  const seedSlots = program ? getSlots(program) : null;
+  const seedStart = seedSlots ? seedSlots[0].start : defaultStart();
+  const seedEnd = seedSlots
+    ? seedSlots[0].end
+    : new Date(seedStart.getTime() + 2 * 3600000);
+  const seedCustom =
+    !!seedSlots &&
+    seedSlots.length > 1 &&
+    seedSlots.some(
+      (s) => fmtT(s.start) !== fmtT(seedStart) || fmtT(s.end) !== fmtT(seedEnd),
+    );
+
   const [title, setTitle] = useState(program?.title || "");
   const [category, setCategory] = useState(program?.category || "");
   const [description, setDescription] = useState(program?.description || "");
-  const [startsAt, setStartsAt] = useState(
-    program ? new Date(program.startsAt) : defaultStart(),
+
+  const [startsAt, setStartsAt] = useState(seedStart);
+  const [endTime, setEndTime] = useState(seedEnd);
+  const [days, setDays] = useState(String(seedSlots?.length || 1));
+  const [skipWeekends, setSkipWeekends] = useState(false);
+  const [custom, setCustom] = useState(seedCustom);
+  // Days 2..n when customising: [{ start: Date, endTime: Date }]
+  const [rows, setRows] = useState(
+    seedCustom
+      ? seedSlots.slice(1).map((s) => ({ start: s.start, endTime: s.end }))
+      : [],
   );
+
   const [locationType, setLocationType] = useState(
     program?.locationType || "physical",
   );
@@ -119,6 +246,56 @@ function Body({ program, saving, onClose, onSubmit }) {
     })) || [],
   );
 
+  const n = Math.max(1, Math.min(parseInt(days || "1", 10) || 1, MAX_DAYS));
+
+  const generatedRow = (
+    i,
+    base = startsAt,
+    t = endTime,
+    skip = skipWeekends,
+  ) => {
+    const start = nthDay(base, i, skip);
+    return { start, endTime: dayEnd(start, t) };
+  };
+
+  // Final schedule (Date objects)
+  const schedule = [
+    { start: startsAt, end: dayEnd(startsAt, endTime) },
+    ...Array.from({ length: n - 1 }, (_, k) => {
+      const r = custom && rows[k] ? rows[k] : generatedRow(k + 1);
+      return { start: r.start, end: dayEnd(r.start, r.endTime) };
+    }),
+  ];
+
+  const changeDays = (text) => {
+    const digits = text.replace(/[^0-9]/g, "");
+    const clamped = digits
+      ? String(Math.min(parseInt(digits, 10), MAX_DAYS))
+      : "";
+    setDays(clamped);
+    const next = Math.max(1, parseInt(clamped || "1", 10));
+    if (custom) {
+      setRows((prev) =>
+        Array.from(
+          { length: next - 1 },
+          (_, k) => prev[k] || generatedRow(k + 1),
+        ),
+      );
+    }
+  };
+
+  const toggleCustom = (on) => {
+    setCustom(on);
+    if (on) {
+      setRows(Array.from({ length: n - 1 }, (_, k) => generatedRow(k + 1)));
+    }
+  };
+
+  const setRow = (k, patch) =>
+    setRows((prev) =>
+      prev.map((r, idx) => (idx === k ? { ...r, ...patch } : r)),
+    );
+
   const activeLoc = LOCATION_TYPES.find((l) => l.value === locationType);
 
   const changeCount = (text) => {
@@ -128,36 +305,15 @@ function Body({ program, saving, onClose, onSubmit }) {
       setMods([]);
       return;
     }
-    const n = Math.min(parseInt(digits, 10), MAX_MODERATORS);
-    setModCount(String(n));
+    const c = Math.min(parseInt(digits, 10), MAX_MODERATORS);
+    setModCount(String(c));
     setMods((prev) =>
-      Array.from({ length: n }, (_, i) => prev[i] || emptyModerator()),
+      Array.from({ length: c }, (_, i) => prev[i] || emptyModerator()),
     );
   };
 
   const setMod = (i, f, v) =>
     setMods((prev) => prev.map((m, idx) => (idx === i ? { ...m, [f]: v } : m)));
-
-  const openAndroid = () => {
-    DateTimePickerAndroid.open({
-      value: startsAt,
-      mode: "date",
-      minimumDate: editing ? undefined : new Date(),
-      onChange: (e, date) => {
-        if (e.type !== "set" || !date) return;
-        DateTimePickerAndroid.open({
-          value: date,
-          mode: "time",
-          onChange: (te, time) => {
-            if (te.type !== "set" || !time) return;
-            const c = new Date(date);
-            c.setHours(time.getHours(), time.getMinutes(), 0, 0);
-            setStartsAt(c);
-          },
-        });
-      },
-    });
-  };
 
   const pickPoster = async () => {
     try {
@@ -198,6 +354,15 @@ function Body({ program, saving, onClose, onSubmit }) {
       return "Please choose a future date and time.";
     }
 
+    for (let i = 0; i < schedule.length; i++) {
+      const s = schedule[i];
+      const l = `Day ${i + 1}`;
+      if (s.end <= s.start) return `${l}: end time must be after start time.`;
+      if (i > 0 && s.start < schedule[i - 1].end) {
+        return `${l} must start after day ${i} ends.`;
+      }
+    }
+
     if (locationType === "physical" && !locationDetails.trim()) {
       return "Please enter the physical venue or address.";
     }
@@ -206,7 +371,6 @@ function Body({ program, saving, onClose, onSubmit }) {
       if (!locationDetails.trim()) {
         return "Please enter the external meeting link.";
       }
-
       const link = locationDetails.trim();
       if (!/^https?:\/\/|^[\w-]+(\.[\w-]+)+/.test(link)) {
         return "Enter a valid meeting link.";
@@ -220,7 +384,6 @@ function Body({ program, saving, onClose, onSubmit }) {
     for (let i = 0; i < mods.length; i++) {
       const m = mods[i];
       const l = `Moderator ${i + 1}`;
-
       if (!m.name.trim()) return `${l}: name is required.`;
       if (!EMAIL_REGEX.test(m.email.trim())) {
         return `${l}: enter a valid email address.`;
@@ -229,7 +392,6 @@ function Body({ program, saving, onClose, onSubmit }) {
         return `${l}: enter a valid phone number.`;
       }
     }
-
     return null;
   };
 
@@ -240,7 +402,10 @@ function Body({ program, saving, onClose, onSubmit }) {
       title,
       category,
       description,
-      startsAt,
+      startsAt: schedule[0].start,
+      endsAt: schedule[schedule.length - 1].end,
+      days: n,
+      schedule,
       locationType,
       locationDetails,
       isPaid,
@@ -278,28 +443,123 @@ function Body({ program, saving, onClose, onSubmit }) {
           onChangeText={setCategory}
         />
 
-        <Text style={cp.label}>Date & time *</Text>
-        {Platform.OS === "android" ? (
-          <PressableScale style={cp.dateBtn} onPress={openAndroid}>
-            <Ionicons name="calendar-outline" size={18} color="#1E3A8A" />
-            <Text style={{ fontSize: 14, color: "#0F172A" }}>
-              {fmt(startsAt)}
-            </Text>
-          </PressableScale>
-        ) : (
-          <View style={{ alignItems: "flex-start", marginBottom: 14 }}>
-            <DateTimePicker
-              value={startsAt}
-              mode="datetime"
-              display="compact"
-              minimumDate={editing ? undefined : new Date()}
-              onChange={(_, s) => s && setStartsAt(s)}
-            />
-          </View>
+        {/* ---------------- Duration ---------------- */}
+        <Text style={cp.label}>Number of days *</Text>
+        <Text style={cp.helper}>
+          Running over several days, weeks or months? Enter the total number of
+          session days, then set the timetable.
+        </Text>
+        <View style={cp.chipRow}>
+          {DAY_PRESETS.map((p) => {
+            const on = n === p.n;
+            return (
+              <PressableScale
+                key={p.n}
+                scaleTo={0.94}
+                haptic
+                style={[cp.dayChip, on && cp.dayChipOn]}
+                onPress={() => changeDays(String(p.n))}
+              >
+                <Text style={[cp.dayChipText, on && cp.dayChipTextOn]}>
+                  {p.label}
+                </Text>
+              </PressableScale>
+            );
+          })}
+        </View>
+        <Input
+          placeholder={`1 to ${MAX_DAYS}`}
+          value={days}
+          onChangeText={changeDays}
+          keyboardType="number-pad"
+          maxLength={2}
+        />
+
+        {/* ---------------- Timetable ---------------- */}
+        <Text style={cp.label}>
+          {n > 1 ? "Day 1 timetable *" : "Date & time *"}
+        </Text>
+        <View style={cp.timeRow}>
+          <PickerField
+            label="Starts"
+            mode="datetime"
+            value={startsAt}
+            minimumDate={editing ? undefined : new Date()}
+            onChange={setStartsAt}
+          />
+          <PickerField
+            label="Ends at"
+            mode="time"
+            value={endTime}
+            onChange={setEndTime}
+          />
+        </View>
+
+        {n > 1 && (
+          <Animated.View entering={FadeInDown.duration(220)}>
+            <View style={cp.switchRow}>
+              <Text style={cp.switchLabel}>Skip weekends</Text>
+              <Switch
+                value={skipWeekends}
+                onValueChange={setSkipWeekends}
+                disabled={custom}
+                trackColor={{ false: "#E2E8F0", true: "#93C5FD" }}
+                thumbColor={skipWeekends ? "#1E3A8A" : "#94A3B8"}
+              />
+            </View>
+            <View style={cp.switchRow}>
+              <Text style={cp.switchLabel}>
+                Set different times for each day
+              </Text>
+              <Switch
+                value={custom}
+                onValueChange={toggleCustom}
+                trackColor={{ false: "#E2E8F0", true: "#93C5FD" }}
+                thumbColor={custom ? "#1E3A8A" : "#94A3B8"}
+              />
+            </View>
+
+            {custom ? (
+              rows.slice(0, n - 1).map((r, k) => (
+                <Animated.View
+                  key={k}
+                  entering={FadeInDown.duration(200)}
+                  style={cp.dayCard}
+                >
+                  <Text style={cp.dayCardTitle}>Day {k + 2}</Text>
+                  <View style={[cp.timeRow, { marginBottom: 0 }]}>
+                    <PickerField
+                      label="Starts"
+                      mode="datetime"
+                      value={r.start}
+                      onChange={(v) => setRow(k, { start: v })}
+                    />
+                    <PickerField
+                      label="Ends at"
+                      mode="time"
+                      value={r.endTime}
+                      onChange={(v) => setRow(k, { endTime: v })}
+                    />
+                  </View>
+                </Animated.View>
+              ))
+            ) : (
+              <Text style={cp.helper}>
+                Every day runs {fmtT(startsAt)} – {fmtT(endTime)}. Last day:{" "}
+                {new Date(schedule[n - 1].start).toLocaleDateString("en-US", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+                .
+              </Text>
+            )}
+          </Animated.View>
         )}
 
+        {/* ---------------- Delivery ---------------- */}
         <Text style={cp.label}>Program delivery method *</Text>
-
         <Segments
           options={LOCATION_TYPES}
           value={locationType}
@@ -311,11 +571,7 @@ function Body({ program, saving, onClose, onSubmit }) {
 
         {(locationType === "physical" || locationType === "virtual") && (
           <Input
-            placeholder={
-              locationType === "physical"
-                ? "Enter venue or physical address"
-                : "Paste Zoom, Google Meet or other meeting link"
-            }
+            placeholder={activeLoc?.placeholder}
             value={locationDetails}
             onChangeText={setLocationDetails}
             autoCapitalize="none"
@@ -324,14 +580,17 @@ function Body({ program, saving, onClose, onSubmit }) {
         )}
 
         {locationType === "in_app_video" && (
-          <Text style={{ color: "#64748B", fontSize: 12, marginBottom: 14 }}>
-            Clients will join a video session directly inside the app.
+          <Text style={cp.helper}>
+            Clients join a video session inside the app. They can join late
+            while you're live, until you end the room or the day's end time
+            passes.
           </Text>
         )}
-
         {locationType === "in_app_audio" && (
-          <Text style={{ color: "#64748B", fontSize: 12, marginBottom: 14 }}>
-            Clients will join an audio-only session directly inside the app.
+          <Text style={cp.helper}>
+            Clients join an audio-only session inside the app. They can join
+            late while you're live, until you end the room or the day's end time
+            passes.
           </Text>
         )}
 
@@ -479,7 +738,6 @@ function Body({ program, saving, onClose, onSubmit }) {
   );
 }
 
-// `open` toggles the modal; `program` is null for create, or the program to edit.
 export default function ProgramFormModal({
   open,
   program,

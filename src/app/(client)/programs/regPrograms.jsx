@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../../libs/supabase";
+import Timetable from "../../../components/counselor/programs/Timetable";
+import { totalDays } from "../../../components/counselor/programs/schedule";
 import { styles } from "../../../styles/(client)/programs/regPrograms";
 import { useAuth } from "../../_layout";
 
@@ -277,6 +279,18 @@ export default function RejPrograms() {
               })}
             </Text>
           </View>
+
+          {totalDays(program) > 1 && (
+            <>
+              <View style={styles.infoRow}>
+                <Ionicons name="layers-outline" size={18} color="#16A34A" />
+                <Text style={styles.infoText}>
+                  Runs for {totalDays(program)} days
+                </Text>
+              </View>
+              <Timetable program={program} accent="#16A34A" />
+            </>
+          )}
 
           {/* Conditional Meeting Link / Location Handling */}
           <View style={styles.locationContainer}>

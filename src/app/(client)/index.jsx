@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Linking,
@@ -75,6 +75,24 @@ export default function ClientDashboard() {
     }, []),
   );
 
+  useEffect(() => {
+    if (!user?.id) return;
+    const ch = supabase
+      .channel(`programs-live-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "programs" },
+        ({ new: row }) =>
+          setUpcomingPrograms((prev) =>
+            prev.map((p) =>
+              p.id === row.id ? { ...p, call_status: row.call_status } : p,
+            ),
+          ),
+      )
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [user?.id]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading((prev) => prev && true);
@@ -137,9 +155,9 @@ export default function ClientDashboard() {
       const { data: programData, error: programError } = await supabase
         .from("programs")
         .select(
-          "id, title, category, description, starts_at, location_type, location_details, call_status, call_mode, is_paid, amount, currency",
+          "id, title, category, description, starts_at, ends_at, total_days, schedule, location_type, location_details, call_status, call_mode, is_paid, amount, currency",
         )
-        .gte("starts_at", new Date().toISOString())
+        .gte("ends_at", new Date().toISOString())
         .order("starts_at", { ascending: true })
         .limit(3);
 

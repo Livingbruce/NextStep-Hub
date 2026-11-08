@@ -1,20 +1,42 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
+
 import { Image, Modal, Text, View } from "react-native";
+
 import Animated, {
   FadeInDown,
   FadeOut,
   LinearTransition,
 } from "react-native-reanimated";
+
 import { pg } from "../../../styles/(client)/programsUi";
+
+import * as TimetableModule from "../../counselor/programs/Timetable";
+
+import { totalDays } from "../../counselor/programs/schedule";
+
 import PressableScale from "../appointments/PressableScale";
 import { formatWhen, relativeLabel } from "../home/time";
 
+const Timetable = TimetableModule.Timetable || TimetableModule.default;
+
 const LOCATION = {
-  physical: { icon: "location-outline", label: "In person" },
-  virtual: { icon: "link-outline", label: "Online meeting" },
-  in_app_video: { icon: "videocam-outline", label: "In-app video" },
-  in_app_audio: { icon: "call-outline", label: "In-app audio" },
+  physical: {
+    icon: "location-outline",
+    label: "In person",
+  },
+  virtual: {
+    icon: "link-outline",
+    label: "Online meeting",
+  },
+  in_app_video: {
+    icon: "videocam-outline",
+    label: "In-app video",
+  },
+  in_app_audio: {
+    icon: "call-outline",
+    label: "In-app audio",
+  },
 };
 
 export default function EnrolledCard({
@@ -27,12 +49,21 @@ export default function EnrolledCard({
   style,
 }) {
   const [modalVisible, setModalVisible] = useState(false);
+  const [showTable, setShowTable] = useState(false);
+
   const loc = LOCATION[program.location_type] || LOCATION.physical;
+
   const date = new Date(program.starts_at);
+
   const attended = status === "participated";
+
   const inApp = ["in_app_video", "in_app_audio"].includes(
     program.location_type,
   );
+
+  const days = totalDays(program);
+
+  const isLive = program.call_status === "live";
 
   const fee = program.is_paid
     ? `${program.currency || "KES"} ${Number(program.amount).toLocaleString()}`
@@ -71,11 +102,17 @@ export default function EnrolledCard({
         )}
 
         <View style={pg.cardBody}>
+          {/* Program heading */}
           <View style={pg.cardHead}>
             <View style={pg.dateBlock}>
               <Text style={pg.dateDay}>{date.getDate()}</Text>
+
               <Text style={pg.dateMonth}>
-                {date.toLocaleString("en-US", { month: "short" }).toUpperCase()}
+                {date
+                  .toLocaleString("en-US", {
+                    month: "short",
+                  })
+                  .toUpperCase()}
               </Text>
             </View>
 
@@ -85,26 +122,39 @@ export default function EnrolledCard({
                   {program.category || "Program"}
                 </Text>
               </View>
+
               <Text style={pg.cardTitle} numberOfLines={2}>
                 {program.title}
               </Text>
             </View>
           </View>
 
+          {/* Description */}
           {!!program.description && (
             <Text style={pg.cardDesc} numberOfLines={2}>
               {program.description}
             </Text>
           )}
 
+          {/* Program information */}
           <View style={pg.metaWrap}>
             <View style={pg.pill}>
               <Ionicons name="time-outline" size={13} color="#64748B" />
+
               <Text style={pg.pillText}>{formatWhen(program.starts_at)}</Text>
             </View>
 
+            {days > 1 && (
+              <View style={pg.pill}>
+                <Ionicons name="layers-outline" size={13} color="#64748B" />
+
+                <Text style={pg.pillText}>{days} days</Text>
+              </View>
+            )}
+
             <View style={pg.pill}>
               <Ionicons name={loc.icon} size={13} color="#64748B" />
+
               <Text style={pg.pillText}>{loc.label}</Text>
             </View>
 
@@ -125,6 +175,34 @@ export default function EnrolledCard({
             </View>
           </View>
 
+          {/* Multi-day timetable */}
+          {days > 1 && (
+            <>
+              <PressableScale
+                onPress={() => setShowTable((value) => !value)}
+                style={{
+                  marginTop: 12,
+                  alignSelf: "flex-start",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "800",
+                    color: "#936D9A",
+                  }}
+                >
+                  {showTable ? "Hide timetable" : "View timetable"}
+                </Text>
+              </PressableScale>
+
+              {showTable && Timetable && (
+                <Timetable program={program} accent="#936D9A" />
+              )}
+            </>
+          )}
+
+          {/* Program status and action */}
           <View style={pg.cardFoot}>
             {past ? (
               <View style={[pg.statusChip, attended && pg.statusChipOk]}>
@@ -143,6 +221,7 @@ export default function EnrolledCard({
             {!past && (
               <PressableScale
                 haptic
+                disabled={inApp && !isLive}
                 containerStyle={{ flexShrink: 1 }}
                 style={[
                   pg.action,
@@ -167,9 +246,12 @@ export default function EnrolledCard({
                   size={15}
                   color="#FFFFFF"
                 />
+
                 <Text style={pg.actionText} numberOfLines={1}>
                   {inApp
-                    ? "Join session"
+                    ? isLive
+                      ? "Join now (live)"
+                      : "Waiting for host"
                     : program.location_type === "virtual"
                       ? "Join meeting"
                       : "View venue"}
@@ -180,6 +262,7 @@ export default function EnrolledCard({
         </View>
       </PressableScale>
 
+      {/* Poster image modal */}
       <Modal
         visible={modalVisible}
         transparent
@@ -214,7 +297,10 @@ export default function EnrolledCard({
 
           <Image
             source={{ uri: program.poster_url }}
-            style={{ width: "100%", height: "85%" }}
+            style={{
+              width: "100%",
+              height: "85%",
+            }}
             resizeMode="contain"
           />
         </View>

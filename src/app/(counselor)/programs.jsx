@@ -23,6 +23,7 @@ import ProgramsSkeleton from "../../components/client/programs/ProgramSkeleton";
 import CounselorProgramCard from "../../components/counselor/programs/CounselorProgramCard";
 import ParticipantsModal from "../../components/counselor/programs/ParticipantsModal";
 import ProgramFormModal from "../../components/counselor/programs/ProgramFormModal";
+import { isProgramOver } from "../../components/counselor/programs/schedule";
 
 import { cp } from "../../styles/(counselor)/programsUi";
 
@@ -47,7 +48,11 @@ const mapProgram = (row) => ({
   posterUrl: row.poster_url,
   posterPath: row.poster_path,
 
-  status: new Date(row.starts_at) >= new Date() ? "Available" : "Past",
+  totalDays: row.total_days || 1,
+  schedule: row.schedule || [],
+  endsAt: row.ends_at,
+
+  status: isProgramOver(row) ? "Past" : "Available",
 
   moderators: (row.program_moderators || []).map((m) => ({
     id: m.id,
@@ -191,7 +196,7 @@ export default function Programs() {
   };
 
   /* ------------------------------------------------------------------ */
-  /* LIVE PROGRAM ENTRY POINT                                           */
+  /* LIVE PROGRAM                                                       */
   /* ------------------------------------------------------------------ */
 
   const start = useCallback(
@@ -293,6 +298,12 @@ export default function Programs() {
         category: form.category.trim() || "General Mentorship",
         description: form.description.trim() || null,
         starts_at: form.startsAt.toISOString(),
+        ends_at: form.endsAt.toISOString(),
+        total_days: form.days,
+        schedule: form.schedule.map((s) => ({
+          start: s.start.toISOString(),
+          end: s.end.toISOString(),
+        })),
 
         location_type: locationType,
         location_details: locationDetails || null,
