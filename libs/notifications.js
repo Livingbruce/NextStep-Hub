@@ -4,6 +4,7 @@ export const NOTIFICATION_TYPES = {
   NEW_APPOINTMENT: "new_appointment",
   APPOINTMENT_REMINDER_24H: "appointment_reminder_24h",
   APPOINTMENT_REMINDER_1H: "appointment_reminder_1h",
+  SESSION_LIVE: "session_live",
   LINK_UPDATED: "link_updated",
   COUNSELOR_SIGNUP: "counselor_signup",
   NEW_PROGRAM: "new_program",
@@ -59,13 +60,16 @@ export async function fetchNotifications(userId, limit = 50) {
 }
 
 export async function markNotificationRead(id) {
-  await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+  await supabase
+    .from("notifications")
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq("id", id);
 }
 
 export async function markAllNotificationsRead(userId) {
   await supabase
     .from("notifications")
-    .update({ is_read: true })
+    .update({ is_read: true, read_at: new Date().toISOString() })
     .eq("recipient_id", userId)
     .eq("is_read", false);
 }
