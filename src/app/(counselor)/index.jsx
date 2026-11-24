@@ -3,7 +3,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Linking,
   RefreshControl,
   ScrollView,
   Text,
@@ -255,18 +254,6 @@ export default function CounselorDashboard() {
       notes: s.notes || "",
     });
 
-  const dial = (phone) => {
-    const n = (phone || "").replace(/[^0-9+]/g, "");
-    if (!n)
-      return Alert.alert(
-        "No phone number",
-        "No contact number is available for this client.",
-      );
-    Linking.openURL(`tel:${n}`).catch(() =>
-      Alert.alert("Error", "Could not open the phone dialer."),
-    );
-  };
-
   /* ----------------------------- sections ----------------------------- */
   const main = (
     <View style={twoCol ? cd.colMain : undefined}>
@@ -276,9 +263,7 @@ export default function CounselorDashboard() {
           now={now}
           isActive={hero.id === activeId}
           busy={call.connecting}
-          onVideo={() => startSession(hero, true)}
-          onAudio={() => startSession(hero, false)}
-          onDial={dial}
+          onStart={(video) => startSession(hero, video)}
           onReturn={call.expand}
           onDetails={goToAppointments}
         />
@@ -329,11 +314,7 @@ export default function CounselorDashboard() {
                   session={s}
                   index={gi * 3 + i}
                   now={now}
-                  onStart={() =>
-                    s.session_mode === "phone"
-                      ? dial(s.client_call_phone || s.client?.phone_no)
-                      : startSession(s, true)
-                  }
+                  onStart={() => startSession(s, s.session_mode !== "phone")}
                   onOpen={goToAppointments}
                 />
               ))}

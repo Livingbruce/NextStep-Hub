@@ -4,12 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   RefreshControl,
   ScrollView,
   Text,
   useWindowDimensions,
-  View,
+  View
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import Animated, {
@@ -21,11 +20,8 @@ import Animated, {
   ZoomIn,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  createNotification,
-  NOTIFICATION_TYPES,
-} from "../../../libs/notifications";
 import { supabase } from "../../../libs/supabase";
+import useJoinSession from "../../components/call/useJoinSession";
 import AnimatedTabs from "../../components/client/appointments/AnimatedTabs";
 import PressableScale from "../../components/client/appointments/PressableScale";
 import { useNow } from "../../components/client/home/time";
@@ -33,6 +29,8 @@ import ActionModal from "../../components/counselor/appointments/ActionModal";
 import ActiveSessionCard from "../../components/counselor/appointments/ActiveSessionCard";
 import AppointmentsSkeleton from "../../components/counselor/appointments/AppointmentsSkeleton";
 import HistoryCard from "../../components/counselor/appointments/HistoryCard";
+import { clientNameOf } from "../../components/counselor/dashboard/sessionAction";
+import { useCall } from "../../context/CallContext";
 import { ca } from "../../styles/(counselor)/appointmentsUi";
 
 const CLOSED = [
@@ -127,6 +125,9 @@ export default function AppointmentsScreen() {
   const { width } = useWindowDimensions();
   const now = useNow();
 
+  const join = useJoinSession();
+  const call = useCall();
+
   const twoCol = width >= 900;
   const cols = width >= 720 && !twoCol ? 2 : 1;
   const itemWidth = cols === 2 ? "48.5%" : "100%";
@@ -135,13 +136,12 @@ export default function AppointmentsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [savingLinkId, setSavingLinkId] = useState(null);
   const [blocked, setBlocked] = useState({});
   const [savingAbsent, setSavingAbsent] = useState(false);
   const [calOpen, setCalOpen] = useState(twoCol);
   const [expandedId, setExpandedId] = useState(null);
   const [tab, setTab] = useState("current");
-  const [modal, setModal] = useState(null); // { type, session }
+  const [modal, setModal] = useState(null);
   const hasLoaded = useRef(false);
 
   const buzz = (t) => Haptics.notificationAsync(t).catch(() => {});
@@ -279,64 +279,16 @@ export default function AppointmentsScreen() {
     saveAbsent(next);
   };
 
-  /* ------------------------------ link/call ------------------------------ */
-  const handleSaveLink = async (id, link) => {
-    const trimmed = link.trim();
-    try {
-      setSavingLinkId(id);
-      const { error } = await supabase
-        .from("appointments")
-        .update({ session_link: trimmed })
-        .eq("id", id);
-      if (error) throw error;
-
-      const session = appointments.find((a) => a.id === id);
-      const clientId = Array.isArray(session?.client)
-        ? session.client[0]?.id
-        : session?.client?.id;
-      if (clientId) {
-        await createNotification({
-          recipientId: clientId,
-          type: NOTIFICATION_TYPES.LINK_UPDATED,
-          title: "Meeting Link Updated",
-          body: "Your counselor added/updated the virtual meeting link for your session.",
-          data: { appointmentId: id },
-        });
-      }
-      setAppointments((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, session_link: trimmed } : a)),
-      );
-      buzz(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
-      console.error("Error updating session link:", e);
-      buzz(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", e.message || "Failed to update session link.");
-    } finally {
-      setSavingLinkId(null);
-    }
-  };
-
-  const handleJoin = (url) => {
-    if (!url?.trim()) {
-      Alert.alert("No link", "Please save a session link first.");
-      return;
-    }
-    const full = url.startsWith("http") ? url : `https://${url}`;
-    Linking.openURL(full).catch(() =>
-      Alert.alert("Error", "Unable to open meeting link."),
-    );
-  };
-
-  const handleCall = (phone) => {
-    const n = (phone || "").replace(/[^0-9+]/g, "");
-    if (!n) {
-      Alert.alert("No phone number", "No contact number for this client.");
-      return;
-    }
-    Linking.openURL(`tel:${n}`).catch(() =>
-      Alert.alert("Error", "Unable to open the dialer."),
-    );
-  };
+  const startSession = (s, video) =>
+    join({
+      appointmentId: s.id,
+      role: "counselor",
+      peerName: clientNameOf(s),
+      subtitle: `${s.counseling_type} session`,
+      video,
+      intake: { reasons: s.reasons || [], goals: s.session_goals || "" },
+      notes: s.notes || "",
+    });
 
   /* ------------------------------ actions ------------------------------ */
   const closeModal = () => setModal(null);
@@ -455,10 +407,8 @@ export default function AppointmentsScreen() {
               style={{ width: itemWidth }}
               expanded={expandedId === s.id}
               onToggle={() => setExpandedId((p) => (p === s.id ? null : s.id))}
-              onSaveLink={handleSaveLink}
-              savingLink={savingLinkId === s.id}
-              onJoin={handleJoin}
-              onCall={handleCall}
+              onStart={(video) => startSession(s, video)}
+              starting={call.connecting}
               onAction={(type, session) => setModal({ type, session })}
             />
           ))}

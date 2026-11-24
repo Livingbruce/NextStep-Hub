@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Text, TextInput, View } from "react-native";
+import { useEffect } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -11,14 +11,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { ca } from "../../../styles/(counselor)/appointmentsUi";
+import { joinState } from "../../call/callWindow";
 import PressableScale from "../../client/appointments/PressableScale";
 import { formatWhen, relativeLabel } from "../../client/home/time";
-import {
-  clientNameOf,
-  clientOf,
-  initialsOf,
-  phoneOf,
-} from "../dashboard/sessionAction";
+import { clientNameOf, clientOf, initialsOf } from "../dashboard/sessionAction";
 
 const ACTIONS = [
   {
@@ -81,23 +77,17 @@ export default function ActiveSessionCard({
   now,
   expanded,
   onToggle,
-  onSaveLink,
-  onJoin,
-  onCall,
+  onStart,
+  starting,
   onAction,
-  savingLink,
   style,
 }) {
   const client = clientOf(session);
   const name = clientNameOf(session);
   const phoneMode = session.session_mode === "phone";
   const isLate = new Date(session.scheduled_start_time).getTime() < now;
-  const [draft, setDraft] = useState(session.session_link || "");
-  const dirty = draft.trim() !== (session.session_link || "").trim();
-
-  useEffect(() => {
-    setDraft(session.session_link || "");
-  }, [session.session_link]);
+  const win = joinState(session, now);
+  const open = win.state === "open";
 
   const rot = useSharedValue(0);
   useEffect(() => {
@@ -106,8 +96,6 @@ export default function ActiveSessionCard({
   const chevron = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rot.get() * 180}deg` }],
   }));
-
-  const callNumber = phoneOf(session);
 
   return (
     <Animated.View
@@ -244,69 +232,40 @@ export default function ActiveSessionCard({
       )}
 
       <View style={ca.connect}>
-        {phoneMode ? (
-          <>
-            <View style={ca.phoneBox}>
-              <Ionicons name="call" size={16} color="#0284C7" />
-              <Text style={ca.phoneText}>
-                Call {name} on{" "}
-                <Text style={{ fontWeight: "800" }}>{callNumber || "N/A"}</Text>
-              </Text>
-            </View>
-            <PressableScale
-              haptic
-              style={[ca.primary, { backgroundColor: "#16A34A" }]}
-              onPress={() => onCall(callNumber)}
-            >
-              <Ionicons name="call" size={17} color="#FFFFFF" />
-              <Text style={ca.primaryText}>Call client</Text>
-            </PressableScale>
-          </>
-        ) : (
-          <>
-            <View style={ca.linkRow}>
-              <TextInput
-                style={ca.linkInput}
-                placeholder="Add Google Meet or Zoom link..."
-                placeholderTextColor="#94A3B8"
-                value={draft}
-                onChangeText={setDraft}
-                autoCapitalize="none"
-                keyboardType="url"
-                selectionColor="#1E3A8A"
+        <PressableScale
+          haptic
+          disabled={!open || starting}
+          style={[
+            ca.primary,
+            {
+              backgroundColor: open
+                ? phoneMode
+                  ? "#16A34A"
+                  : "#1E3A8A"
+                : "#94A3B8",
+            },
+          ]}
+          onPress={() => onStart(!phoneMode)}
+        >
+          {starting ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons
+                name={phoneMode ? "call" : "videocam"}
+                size={17}
+                color="#FFFFFF"
               />
-              <PressableScale
-                haptic
-                disabled={!dirty || savingLink}
-                containerStyle={{ opacity: dirty ? 1 : 0.4 }}
-                style={ca.saveBtn}
-                onPress={() => onSaveLink(session.id, draft)}
-                accessibilityLabel="Save meeting link"
-              >
-                {savingLink ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                )}
-              </PressableScale>
-            </View>
-            <PressableScale
-              haptic
-              style={[
-                ca.primary,
-                {
-                  backgroundColor: session.session_link?.trim()
-                    ? "#1E3A8A"
-                    : "#94A3B8",
-                },
-              ]}
-              onPress={() => onJoin(session.session_link)}
-            >
-              <Ionicons name="videocam" size={17} color="#FFFFFF" />
-              <Text style={ca.primaryText}>Join virtual room</Text>
-            </PressableScale>
-          </>
-        )}
+              <Text style={ca.primaryText}>
+                {open
+                  ? phoneMode
+                    ? "Call client"
+                    : "Join session"
+                  : win.label}
+              </Text>
+            </>
+          )}
+        </PressableScale>
       </View>
 
       <View style={ca.actions}>

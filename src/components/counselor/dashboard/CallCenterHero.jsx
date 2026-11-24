@@ -6,38 +6,28 @@ import { cc } from "../../../styles/(counselor)/callCenter";
 import { joinState } from "../../call/callWindow";
 import PressableScale from "../../client/appointments/PressableScale";
 import { formatWhen, relativeLabel } from "../../client/home/time";
-import { clientNameOf, clientOf, phoneOf } from "./sessionAction";
+import { clientNameOf, clientOf } from "./sessionAction";
 
-function Btn({ primary, icon, label, onPress, disabled, busy }) {
+const THEME = {
+  phone: { colors: ["#14532D", "#15803D", "#22C55E"], accent: "#15803D" },
+  video: { colors: ["#1E3A8A", "#1D4ED8", "#2563EB"], accent: "#1E3A8A" },
+};
+
+function Btn({ accent, icon, label, onPress, disabled, busy }) {
   return (
     <PressableScale
       haptic
       disabled={disabled || busy}
-      containerStyle={{ flexGrow: primary ? 1.6 : 1 }}
-      style={[
-        cc.btn,
-        primary ? cc.btnPrimary : cc.btnGhost,
-        disabled && cc.btnOff,
-      ]}
+      containerStyle={{ flexGrow: 1 }}
+      style={[cc.btn, cc.btnPrimary, disabled && cc.btnOff]}
       onPress={onPress}
     >
       {busy ? (
-        <ActivityIndicator
-          size="small"
-          color={primary ? "#1E3A8A" : "#FFFFFF"}
-        />
+        <ActivityIndicator size="small" color={accent} />
       ) : (
         <>
-          <Ionicons
-            name={icon}
-            size={17}
-            color={primary ? "#1E3A8A" : "#FFFFFF"}
-          />
-          <Text
-            style={[cc.btnText, { color: primary ? "#1E3A8A" : "#FFFFFF" }]}
-          >
-            {label}
-          </Text>
+          <Ionicons name={icon} size={17} color={accent} />
+          <Text style={[cc.btnText, { color: accent }]}>{label}</Text>
         </>
       )}
     </PressableScale>
@@ -49,14 +39,13 @@ export default function CallCenterHero({
   now,
   isActive,
   busy,
-  onVideo,
-  onAudio,
-  onDial,
+  onStart,
   onReturn,
   onDetails,
 }) {
   const win = joinState(session, now);
   const phone = session.session_mode === "phone";
+  const theme = phone ? THEME.phone : THEME.video;
   const open = win.state === "open";
   const client = clientOf(session);
   const reasons = (session.reasons || []).slice(0, 3);
@@ -64,7 +53,7 @@ export default function CallCenterHero({
   return (
     <Animated.View entering={FadeInDown.delay(100).duration(450)}>
       <LinearGradient
-        colors={["#1E3A8A", "#1D4ED8", "#2563EB"]}
+        colors={theme.colors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={cc.hero}
@@ -94,7 +83,10 @@ export default function CallCenterHero({
         <Text style={cc.heroName} numberOfLines={1}>
           {clientNameOf(session)}
         </Text>
-        <Text style={cc.heroType}>{session.counseling_type} session</Text>
+        <Text style={cc.heroType}>
+          {session.counseling_type} session ·{" "}
+          {phone ? "Phone call" : "Virtual session"}
+        </Text>
 
         <View style={cc.pills}>
           <View style={cc.pill}>
@@ -108,14 +100,6 @@ export default function CallCenterHero({
             <Text style={cc.pillText}>
               {session.duration_minutes || 50} min
             </Text>
-          </View>
-          <View style={cc.pill}>
-            <Ionicons
-              name={phone ? "call-outline" : "videocam-outline"}
-              size={13}
-              color="#FFFFFF"
-            />
-            <Text style={cc.pillText}>{phone ? "Phone" : "Video"}</Text>
           </View>
           {!!client?.county && (
             <View style={cc.pill}>
@@ -148,46 +132,22 @@ export default function CallCenterHero({
         <View style={cc.actions}>
           {isActive ? (
             <Btn
-              primary
+              accent={theme.accent}
               icon="radio"
               label="Return to session"
               onPress={onReturn}
             />
-          ) : phone ? (
-            <>
-              <Btn
-                primary
-                icon="call"
-                label={open ? "Call client" : win.label}
-                disabled={!open}
-                onPress={() => onDial(phoneOf(session))}
-              />
-              <Btn
-                icon="mic"
-                label="In app"
-                disabled={!open}
-                busy={busy}
-                onPress={onAudio}
-              />
-            </>
           ) : (
-            <>
-              <Btn
-                primary
-                icon="videocam"
-                label={open ? "Start video session" : win.label}
-                disabled={!open}
-                busy={busy}
-                onPress={onVideo}
-              />
-              <Btn
-                icon="mic"
-                label="Audio"
-                disabled={!open}
-                busy={busy}
-                onPress={onAudio}
-              />
-            </>
+            <Btn
+              accent={theme.accent}
+              icon={phone ? "call" : "videocam"}
+              label={
+                open ? (phone ? "Call client" : "Join session") : win.label
+              }
+              disabled={!open}
+              busy={busy}
+              onPress={() => onStart(!phone)}
+            />
           )}
           <PressableScale
             haptic
