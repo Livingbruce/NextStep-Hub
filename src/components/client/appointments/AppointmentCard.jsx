@@ -105,7 +105,9 @@ export default function AppointmentCard({
   onToggle,
   onCancel,
   onReview,
-  onDelete,
+  onSkipReview,
+  pendingReview = false,
+  isHistoryView = false,
   busy,
   style,
   live,
@@ -128,7 +130,7 @@ export default function AppointmentCard({
   const isDone = item.status === "completed";
   const isCancelled = CANCELLED.includes(item.status);
   const isMissed = MISSED.includes(item.status);
-  const isActive = !isHistoryAppointment(item);
+  const isActive = !isHistoryAppointment(item) && !pendingReview;
 
   const first = item.counselor?.first_name || "";
   const last = item.counselor?.surname || "";
@@ -136,14 +138,13 @@ export default function AppointmentCard({
     ? `Counselor ${first} ${last}`.trim()
     : "Unassigned counselor";
 
-  const counselorReview = item.reviews?.find(
-    (r) => r.reviewer_role === "counselor",
-  );
   const clientReview = item.reviews?.find((r) => r.reviewer_role === "client");
 
   const when = isActive
     ? relativeLabel(item.scheduled_start_time, Date.now())
-    : "";
+    : pendingReview
+      ? "Review or skip"
+      : "";
 
   const openLink = async (url) => {
     try {
@@ -269,19 +270,7 @@ export default function AppointmentCard({
             </Text>
           </Detail>
 
-          {!!item.notes && (
-            <Detail title="Counselor session notes">
-              <Text style={styles.detailText}>{item.notes}</Text>
-            </Detail>
-          )}
-
-          {!!counselorReview?.counselor_notes && (
-            <Detail title="Counselor review notes">
-              <Text style={styles.detailText}>
-                {counselorReview.counselor_notes}
-              </Text>
-            </Detail>
-          )}
+          {/* Counselor session notes and counselor review notes are intentionally omitted */}
 
           {!!clientReview?.feedback_text && (
             <Detail title="Your feedback">
@@ -308,19 +297,23 @@ export default function AppointmentCard({
                 </>
               )}
               <View style={styles.actionButtonRow}>
-                <PressableScale
-                  containerStyle={{ flex: 1 }}
-                  style={[styles.actionBtn, styles.deleteBtn]}
-                  onPress={() => onDelete(item.id)}
-                  disabled={busy}
-                >
-                  <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                  <Text style={styles.deleteBtnText}>Delete</Text>
-                </PressableScale>
+                {pendingReview && !isHistoryView && onSkipReview && (
+                  <PressableScale
+                    containerStyle={{ flex: 1 }}
+                    style={[styles.actionBtn, styles.cancelBtn]}
+                    onPress={onSkipReview}
+                    disabled={busy}
+                  >
+                    <Text style={styles.cancelBtnText}>Skip review</Text>
+                  </PressableScale>
+                )}
 
                 {!clientReview && (
                   <PressableScale
-                    containerStyle={{ flex: 2 }}
+                    containerStyle={{
+                      flex:
+                        pendingReview && !isHistoryView && onSkipReview ? 2 : 1,
+                    }}
                     style={[styles.actionBtn, styles.submitBtn, { flex: 0 }]}
                     haptic
                     onPress={() => onReview(item.id, reviewText)}
@@ -345,14 +338,6 @@ export default function AppointmentCard({
                   ? `\nReason: "${item.action_reason}"`
                   : ""}
               </Text>
-              <PressableScale
-                style={[styles.actionBtn, styles.deleteBtn, { marginTop: 10 }]}
-                onPress={() => onDelete(item.id)}
-                disabled={busy}
-              >
-                <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                <Text style={styles.deleteBtnText}>Delete record</Text>
-              </PressableScale>
             </View>
           ) : (
             <View style={ui.actions}>

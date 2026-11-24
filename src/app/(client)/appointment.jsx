@@ -15,9 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../libs/supabase";
 import useJoinSession from "../../components/call/useJoinSession";
 import AnimatedTabs from "../../components/client/appointments/AnimatedTabs";
-import AppointmentCard, {
-  isHistoryAppointment,
-} from "../../components/client/appointments/AppointmentCard";
+import AppointmentCard from "../../components/client/appointments/AppointmentCard";
 import AppointmentSkeletonList from "../../components/client/appointments/AppointmentSkeleton";
 import PressableScale from "../../components/client/appointments/PressableScale";
 import { useIncomingCall } from "../../context/IncomingCallContext";
@@ -28,11 +26,36 @@ const GAP = 16;
 const MAX_CONTENT = 1100;
 const H_PADDING = 20;
 
+const ATTENDED_STATUSES = new Set(["attended", "completed"]);
+const HISTORY_STATUSES = new Set([
+  "completed",
+  "cancelled_by_client",
+  "cancelled_by_counselor",
+  "cancelled",
+  "not_attended",
+  "missed",
+  "no_show",
+]);
+
+function isHistoryAppointment(app) {
+  return HISTORY_STATUSES.has((app?.status || "").toLowerCase());
+}
+
+function hasClientReview(appointment, userId) {
+  const list = appointment?.reviews || [];
+  return list.some(
+    (r) =>
+      r.reviewer_role === "client" && (!userId || r.reviewer_id === userId),
+  );
+}
+
 export default function AppointmentScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
 
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [skippedReviewIds, setSkippedReviewIds] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -56,7 +79,6 @@ export default function AppointmentScreen() {
 
   const fetchAppointments = async () => {
     try {
-      // Only show the skeleton on the very first load; later focuses refresh quietly.
       if (!hasLoaded.current) setLoading(true);
 
       const {
@@ -71,6 +93,7 @@ export default function AppointmentScreen() {
         );
         return;
       }
+      setCurrentUserId(user.id);
 
       const { data, error } = await supabase
         .from("appointments")
@@ -82,7 +105,6 @@ export default function AppointmentScreen() {
           other_reason,
           session_goals,
           had_therapy_before,
-          notes,
           session_link,
           scheduled_start_time,
           scheduled_end_time,
@@ -102,7 +124,7 @@ export default function AppointmentScreen() {
             id,
             reviewer_id,
             reviewer_role,
-            counselor_notes,
+            rating,
             feedback_text
           )
         `,
@@ -205,37 +227,13 @@ export default function AppointmentScreen() {
     }
   };
 
-  const handleDelete = (id) => {
-    Alert.alert(
-      "Delete this record?",
-      "It will be removed from your appointments.",
-      [
-        { text: "Keep", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setActionLoading(true);
-              const { error } = await supabase
-                .from("appointments")
-                .delete()
-                .eq("id", id);
-              if (error) throw error;
-
-              // Removing it from state plays the card's exit + reflow animation.
-              setAppointments((prev) => prev.filter((a) => a.id !== id));
-              setExpandedId(null);
-            } catch (err) {
-              console.error("Error deleting appointment:", err);
-              Alert.alert("Couldn't delete", "Please try again.");
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ],
-    );
+  const handleSkipReview = (id) => {
+    setSkippedReviewIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setExpandedId((prev) => (prev === id ? null : prev));
   };
 
   const handleJoin = (item) =>
@@ -248,20 +246,33 @@ export default function AppointmentScreen() {
       video: true,
     });
 
+  const canMoveToHistory = useCallback(
+    (item) => {
+      if (!isHistoryAppointment(item)) return false;
+      if (!ATTENDED_STATUSES.has((item.status || "").toLowerCase())) {
+        return true;
+      }
+      return (
+        hasClientReview(item, currentUserId) || skippedReviewIds.has(item.id)
+      );
+    },
+    [currentUserId, skippedReviewIds],
+  );
+
   // ---- Derived lists ----
   const upcoming = useMemo(
-    () => appointments.filter((a) => !isHistoryAppointment(a)),
-    [appointments],
+    () => appointments.filter((a) => !canMoveToHistory(a)),
+    [appointments, canMoveToHistory],
   );
   const history = useMemo(
     () =>
       appointments
-        .filter(isHistoryAppointment)
+        .filter(canMoveToHistory)
         .sort(
           (a, b) =>
             new Date(b.scheduled_start_time) - new Date(a.scheduled_start_time),
         ),
-    [appointments],
+    [appointments, canMoveToHistory],
   );
 
   const displayed = activeTab === "upcoming" ? upcoming : history;
@@ -334,24 +345,44 @@ export default function AppointmentScreen() {
             />
           ) : displayed.length > 0 ? (
             <View key={activeTab} style={[ui.grid, { gap: GAP }]}>
-              {displayed.map((item, index) => (
-                <AppointmentCard
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  style={{ width: itemWidth }}
-                  expanded={expandedId === item.id}
-                  onToggle={() =>
-                    setExpandedId((prev) => (prev === item.id ? null : item.id))
-                  }
-                  onCancel={handleCancel}
-                  onReview={handleReview}
-                  onDelete={handleDelete}
-                  busy={actionLoading && expandedId === item.id}
-                  live={liveMap[item.id] ?? item.call_status === "live"}
-                  onJoin={() => handleJoin(item)}
-                />
-              ))}
+              {displayed.map((item, index) => {
+                const isAttended = ATTENDED_STATUSES.has(
+                  (item.status || "").toLowerCase(),
+                );
+                const reviewed = hasClientReview(item, currentUserId);
+                const safeItem = {
+                  ...item,
+                  notes: null,
+                  reviews: (item.reviews || []).filter(
+                    (r) =>
+                      r.reviewer_role === "client" &&
+                      r.reviewer_id === currentUserId,
+                  ),
+                };
+
+                return (
+                  <AppointmentCard
+                    key={item.id}
+                    item={safeItem}
+                    index={index}
+                    style={{ width: itemWidth }}
+                    expanded={expandedId === item.id}
+                    onToggle={() =>
+                      setExpandedId((prev) =>
+                        prev === item.id ? null : item.id,
+                      )
+                    }
+                    onCancel={handleCancel}
+                    onReview={handleReview}
+                    onSkipReview={() => handleSkipReview(item.id)}
+                    pendingReview={isAttended && !reviewed}
+                    isHistoryView={activeTab === "history"}
+                    busy={actionLoading && expandedId === item.id}
+                    live={liveMap[item.id] ?? item.call_status === "live"}
+                    onJoin={() => handleJoin(item)}
+                  />
+                );
+              })}
             </View>
           ) : (
             <View key={activeTab} style={ui.empty}>
