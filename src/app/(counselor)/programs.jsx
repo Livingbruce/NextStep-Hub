@@ -61,21 +61,23 @@ const mapProgram = (row) => ({
     phone: m.phone_no,
   })),
 
-  participants: (row.program_participants || []).map((p) => {
-    const c = Array.isArray(p.client) ? p.client[0] : p.client;
+  participants: (row.program_participants || [])
+    .filter((p) => p.role !== "invigilator")
+    .map((p) => {
+      const c = Array.isArray(p.client) ? p.client[0] : p.client;
 
-    return {
-      id: p.id,
-      name:
-        c?.full_name ||
-        [c?.first_name, c?.surname].filter(Boolean).join(" ") ||
-        "Unknown client",
-      email: c?.email || "Not provided",
-      phone: c?.phone_no || "Not provided",
-      county: c?.county || "Not provided",
-      status: p.status === "participated" ? "Participated" : "Registered",
-    };
-  }),
+      return {
+        id: p.id,
+        name:
+          c?.full_name ||
+          [c?.first_name, c?.surname].filter(Boolean).join(" ") ||
+          "Unknown client",
+        email: c?.email || "Not provided",
+        phone: c?.phone_no || "Not provided",
+        county: c?.county || "Not provided",
+        status: p.status === "participated" ? "Participated" : "Registered",
+      };
+    }),
 });
 
 export default function Programs() {
@@ -114,6 +116,7 @@ export default function Programs() {
           program_participants (
             id,
             status,
+            role,
             client:profiles!program_participants_client_id_fkey (
               id,
               full_name,
@@ -228,6 +231,7 @@ export default function Programs() {
   );
 
   const handleSave = async (form) => {
+    let unmatched = [];
     try {
       setSaving(true);
 
@@ -368,6 +372,13 @@ export default function Programs() {
         if (error) throw error;
       }
 
+      const { data: missing, error: syncError } = await supabase.rpc(
+        "sync_program_moderators",
+        { p_program_id: programId },
+      );
+      if (syncError) throw syncError;
+      unmatched = missing || [];
+
       /* Remove replaced poster */
       if (removeOld && oldPath) {
         await supabase.storage.from("posters").remove([oldPath]);
@@ -387,6 +398,13 @@ export default function Programs() {
 
       setFormOpen(false);
       await fetchPrograms();
+
+      if (unmatched.length) {
+        Alert.alert(
+          "Some invigilators have no account yet",
+          `${unmatched.join(", ")}\n\nThey'll be registered once they sign up and you save the program again.`,
+        );
+      }
     } catch (error) {
       console.error("Save program error:", error);
 

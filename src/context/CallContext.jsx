@@ -13,6 +13,7 @@ import { Alert, PermissionsAndroid, Platform } from "react-native";
 import {
   ChannelProfileType,
   ClientRoleType,
+  RemoteAudioState,
   RemoteVideoState,
   createAgoraRtcEngine,
 } from "react-native-agora";
@@ -106,14 +107,16 @@ export function CallProvider({ userId, children }) {
   const [connecting, setConnecting] = useState(false);
   const [status, setStatus] = useState("idle");
 
-  // Backward-compatible single remote participant state.
   const [remoteUid, setRemoteUid] = useState(null);
   const [remoteVideoOn, setRemoteVideoOn] = useState(false);
 
-  // Multiperson participant state.
   const [uids, setUids] = useState([]);
   const [roster, setRoster] = useState({});
+  const [roles, setRoles] = useState({});
   const [remoteVideo, setRemoteVideo] = useState({});
+  const [remoteAudio, setRemoteAudio] = useState({});
+  const [speaking, setSpeaking] = useState({});
+  const [localUid, setLocalUid] = useState(null);
 
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
@@ -172,7 +175,11 @@ export function CallProvider({ userId, children }) {
 
     setUids([]);
     setRoster({});
+    setRoles({});
     setRemoteVideo({});
+    setRemoteAudio({});
+    setSpeaking({});
+    setLocalUid(null);
 
     setMuted(false);
     setCameraOn(true);
@@ -219,19 +226,22 @@ export function CallProvider({ userId, children }) {
 
         const t = await fetchToken({ kind, id }, { video: requestedVideo });
 
-        // The server decides whether this session is audio or video.
         const useVideo = t.mode === "video";
         const publish = !!t.canPublish;
+        const selfRole =
+          t.selfRole || (role === "counselor" ? "host" : "attendee");
+        const startMuted =
+          kind === "program" && selfRole === "panelist" && publish;
 
-        // Audience participants do not need microphone or camera permission.
         if (publish) {
           await ensurePermissions(useVideo);
         }
 
         const names = {};
-
+        const roleMap = {};
         (t.roster || []).forEach((r) => {
           names[r.uid] = r.name;
+          roleMap[r.uid] = r.role === "client" ? "speaker" : r.role;
         });
 
         const clientCount = (t.roster || []).filter(
@@ -282,6 +292,11 @@ export function CallProvider({ userId, children }) {
               return rest;
             });
 
+            setRemoteAudio((p) => {
+              const { [uid]: _a, ...rest } = p;
+              return rest;
+            });
+
             setRemoteVideoOn(next.some((u) => remoteVideo[u]));
 
             if (!next.length) {
@@ -301,6 +316,23 @@ export function CallProvider({ userId, children }) {
             if (uid === remoteUidRef.current) {
               setRemoteVideoOn(isDecoding);
             }
+          },
+
+          onRemoteAudioStateChanged: (_c, uid, state) => {
+            setRemoteAudio((p) => ({
+              ...p,
+              [uid]: state === RemoteAudioState.RemoteAudioStateDecoding,
+            }));
+          },
+
+          onAudioVolumeIndication: (_c, speakers) => {
+            const next = {};
+            (speakers || []).forEach((s) => {
+              if ((s.volume ?? 0) > 20) {
+                next[s.uid === 0 ? t.uid : s.uid] = true;
+              }
+            });
+            setSpeaking(next);
           },
 
           onConnectionLost: () => {
@@ -337,14 +369,16 @@ export function CallProvider({ userId, children }) {
 
         engine.registerEventHandler(handler);
         engine.enableAudio();
+        engine.enableAudioVolumeIndication(400, 3, true);
 
-        // Do not initialize the video pipeline for audio sessions.
         if (useVideo) {
           engine.enableVideo();
+          if (publish && !startMuted) engine.startPreview();
+        }
 
-          if (publish) {
-            engine.startPreview();
-          }
+        if (startMuted) {
+          engine.muteLocalAudioStream(true);
+          if (useVideo) engine.enableLocalVideo(false);
         }
 
         engine.setEnableSpeakerphone(useVideo || kind === "program");
@@ -361,10 +395,10 @@ export function CallProvider({ userId, children }) {
           kind,
           roomId: id,
 
-          // Kept for existing appointment-related UI.
           appointmentId: id,
 
           role,
+          selfRole,
           subtitle,
           intake,
           video: useVideo,
@@ -385,8 +419,10 @@ export function CallProvider({ userId, children }) {
 
         setSession(meta);
         setRoster(names);
-
-        setCameraOn(useVideo && publish);
+        setRoles(roleMap);
+        setLocalUid(t.uid);
+        setMuted(startMuted);
+        setCameraOn(useVideo && publish && !startMuted);
         setSpeakerOn(useVideo || kind === "program");
         setStatus("waiting");
 
@@ -396,7 +432,7 @@ export function CallProvider({ userId, children }) {
             : ClientRoleType.ClientRoleAudience,
 
           publishMicrophoneTrack: publish,
-          publishCameraTrack: publish && useVideo,
+          publishCameraTrack: publish && useVideo && !startMuted,
 
           autoSubscribeAudio: true,
           autoSubscribeVideo: useVideo,
@@ -441,7 +477,6 @@ export function CallProvider({ userId, children }) {
   const ringAgain = useCallback(async () => {
     const s = sessionRef.current;
 
-    // Ring-again behavior is specific to appointments.
     if (!s || s.kind !== "appointment") return;
 
     setClientResponse("ringing");
@@ -505,7 +540,6 @@ export function CallProvider({ userId, children }) {
     [teardown],
   );
 
-  // Appointment-only counselor response and 1:1 decline handling.
   useEffect(() => {
     if (
       !session ||
@@ -530,7 +564,6 @@ export function CallProvider({ userId, children }) {
 
           setClientResponse(n.client_response);
 
-          // Decline handling is for one-to-one appointments only.
           if (
             !session.group &&
             n.client_response === "declined" &&
@@ -553,7 +586,6 @@ export function CallProvider({ userId, children }) {
     handleDeclined,
   ]);
 
-  // Client-side session-ended listener for appointments and programs.
   useEffect(() => {
     if (!session || session.role === "counselor") return;
 
@@ -582,7 +614,6 @@ export function CallProvider({ userId, children }) {
     };
   }, [session?.roomId, session?.role, session?.kind, teardown]);
 
-  // Appointment-only unanswered ring expiry.
   useEffect(() => {
     if (
       !session ||
@@ -629,16 +660,11 @@ export function CallProvider({ userId, children }) {
 
         engine.updateChannelMediaOptions({
           clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-
           publishMicrophoneTrack: true,
-          publishCameraTrack: s.video,
+          publishCameraTrack: false,
         });
-
-        if (s.video) {
-          engine.enableLocalVideo(true);
-          engine.startPreview();
-        }
-
+        engine.muteLocalAudioStream(false);
+        if (s.video) engine.enableLocalVideo(false);
         setMuted(false);
       } else {
         engine.updateChannelMediaOptions({
@@ -658,7 +684,7 @@ export function CallProvider({ userId, children }) {
       canPublishRef.current = can;
 
       setCanPublish(can);
-      setCameraOn(can && s.video);
+      setCameraOn(false);
     } catch (e) {
       Alert.alert(
         "Can't change speaking status",
@@ -779,14 +805,16 @@ export function CallProvider({ userId, children }) {
       connecting,
       status,
 
-      // Existing single-participant properties.
       remoteUid,
       remoteVideoOn,
 
-      // Multiperson properties.
       uids,
       roster,
+      roles,
       remoteVideo,
+      remoteAudio,
+      speaking,
+      localUid,
 
       muted,
       cameraOn,
@@ -820,7 +848,11 @@ export function CallProvider({ userId, children }) {
 
       uids,
       roster,
+      roles,
       remoteVideo,
+      remoteAudio,
+      speaking,
+      localUid,
 
       muted,
       cameraOn,

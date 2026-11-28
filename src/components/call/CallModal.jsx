@@ -29,6 +29,7 @@ import { supabase } from "../../../libs/supabase";
 import { useCall, useCallTimer } from "../../context/CallContext";
 import { cs } from "../../styles/call";
 import PressableScale from "../client/appointments/PressableScale";
+import ProgramStage from "./ProgramStage";
 
 export const initials = (name = "") =>
   name
@@ -40,7 +41,6 @@ export const initials = (name = "") =>
     .join("") || "•";
 
 export function SignalBars({ quality }) {
-  // Agora: 1-2 good, 3-4 fair, 5-6 poor
   const level = quality === 0 ? 0 : quality <= 2 ? 3 : quality <= 4 ? 2 : 1;
   const color = level === 3 ? "#4ADE80" : level === 2 ? "#FACC15" : "#F87171";
 
@@ -111,7 +111,9 @@ function SpeakerPanel({ programId }) {
 
     const { data, error } = await supabase
       .from("program_participants")
-      .select("client_id, can_speak, profile:client_id ( first_name, surname )")
+      .select(
+        "client_id, can_speak, role, profile:client_id ( first_name, surname )",
+      )
       .eq("program_id", programId);
 
     if (error) {
@@ -200,26 +202,30 @@ function SpeakerPanel({ programId }) {
                   {name}
                 </Text>
 
-                <PressableScale
-                  haptic
-                  onPress={() => toggle(r)}
-                  style={[
-                    cs.notesToggle,
-                    {
-                      marginBottom: 0,
-                      paddingVertical: 7,
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name={r.can_speak ? "mic" : "mic-off"}
-                    size={14}
-                    color="#fff"
-                  />
-                  <Text style={cs.notesToggleText}>
-                    {r.can_speak ? "Speaking" : "Allow to speak"}
-                  </Text>
-                </PressableScale>
+                {r.role === "invigilator" ? (
+                  <Text style={cs.notesToggleText}>Invigilator</Text>
+                ) : (
+                  <PressableScale
+                    haptic
+                    onPress={() => toggle(r)}
+                    style={[
+                      cs.notesToggle,
+                      {
+                        marginBottom: 0,
+                        paddingVertical: 7,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={r.can_speak ? "mic" : "mic-off"}
+                      size={14}
+                      color="#fff"
+                    />
+                    <Text style={cs.notesToggleText}>
+                      {r.can_speak ? "Speaking" : "Allow to speak"}
+                    </Text>
+                  </PressableScale>
+                )}
               </View>
             );
           })
@@ -290,7 +296,6 @@ export default function CallModal() {
 
     await endCall();
 
-    // Events/programs must not run appointment attendance handling.
     if (s.role !== "counselor" || s.kind !== "appointment") return;
 
     if (text) {
@@ -370,7 +375,9 @@ export default function CallModal() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={cs.root}>
-          {showRemoteVideo ? (
+          {program ? (
+            <ProgramStage />
+          ) : showRemoteVideo ? (
             <RtcSurfaceView
               style={StyleSheet.absoluteFill}
               canvas={{ uid: remoteUid }}
@@ -406,7 +413,6 @@ export default function CallModal() {
             </LinearGradient>
           )}
 
-          {/* Top bar */}
           <LinearGradient
             colors={["rgba(0,0,0,0.6)", "transparent"]}
             style={[cs.topBar, { paddingTop: insets.top + 10 }]}
@@ -454,7 +460,6 @@ export default function CallModal() {
             />
           </LinearGradient>
 
-          {/* Reconnection banner */}
           {status === "reconnecting" && (
             <Animated.View
               entering={FadeInDown}
@@ -466,8 +471,7 @@ export default function CallModal() {
             </Animated.View>
           )}
 
-          {/* Local video preview: publishers only */}
-          {video && canPublish && (
+          {video && canPublish && !program && (
             <View style={[cs.pip, { top: insets.top + 78 }]}>
               {cameraOn ? (
                 <RtcSurfaceView
@@ -488,9 +492,7 @@ export default function CallModal() {
             </View>
           )}
 
-          {/* Bottom: notes, speaker panel and controls */}
           <View style={[cs.bottom, { paddingBottom: insets.bottom + 14 }]}>
-            {/* Appointment-only private notes */}
             {counselor && appointment && (
               <>
                 {notesOpen && (
@@ -557,12 +559,10 @@ export default function CallModal() {
               </>
             )}
 
-            {/* Program host attendee controls */}
             {counselor && program && programId && (
               <SpeakerPanel programId={programId} />
             )}
 
-            {/* Call controls */}
             <View style={cs.controls}>
               {canPublish && (
                 <Ctrl
